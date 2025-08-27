@@ -1,37 +1,27 @@
-use std::env;
-use std::fs;
-use std::io::{self, Write};
+use clap::{Parser, Subcommand};
+use codecrafters_interpreter::Lexer;
+use std::path::PathBuf;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 3 {
-        writeln!(io::stderr(), "Usage: {} tokenize <filename>", args[0]).unwrap();
-        return;
-    }
+#[derive(Debug, Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+}
 
-    let command = &args[1];
-    let filename = &args[2];
+#[derive(Subcommand, Debug)]
+enum Command {
+    Tokenize { filename: PathBuf },
+}
 
-    match command.as_str() {
-        "tokenize" => {
-            // You can use print statements as follows for debugging, they'll be visible when running tests.
-            writeln!(io::stderr(), "Logs from your program will appear here!").unwrap();
-
-            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                writeln!(io::stderr(), "Failed to read file {}", filename).unwrap();
-                String::new()
-            });
-
-            // Uncomment this block to pass the first stage
-            // if !file_contents.is_empty() {
-            //     panic!("Scanner not implemented");
-            // } else {
-            //     println!("EOF  null"); // Placeholder, replace this line when implementing the scanner
-            // }
-        }
-        _ => {
-            writeln!(io::stderr(), "Unknown command: {}", command).unwrap();
-            return;
+fn main() -> codecrafters_interpreter::Result<()> {
+    let args = Cli::parse();
+    match args.command {
+        Command::Tokenize { filename } => {
+            let file_content = std::fs::read_to_string(filename)?;
+            let mut lexer = Lexer::new(&file_content);
+            let token = lexer.next().unwrap();
+            println!("{token}");
         }
     }
+    Ok(())
 }
