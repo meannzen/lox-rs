@@ -19,8 +19,10 @@ fn main() -> codecrafters_interpreter::Result<()> {
         Command::Tokenize { filename } => {
             let file_content = std::fs::read_to_string(filename)?;
             let mut lexer = Lexer::new(&file_content);
-            let token = lexer.next().unwrap();
-            println!("{token}");
+            while let Some(token) = lexer.next() {
+                println!("{}", token);
+            }
+            println!("EOF  null");
         }
     }
     Ok(())
