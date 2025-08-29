@@ -49,7 +49,14 @@ impl<'c> Lexer<'c> {
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semi,
-            '/' => TokenKind::Slash,
+            '/' => {
+                if let Some(_) = self.input.next_if_eq(&'/') {
+                    self.next_line();
+                    return self.next_token();
+                } else {
+                    TokenKind::Slash
+                }
+            }
             '=' => {
                 if let Some(next_ch) = self.input.next_if_eq(&'=') {
                     literal.push(next_ch);
@@ -98,6 +105,17 @@ impl<'c> Lexer<'c> {
             if c.is_ascii_whitespace() {
                 self.advance();
             } else {
+                break;
+            }
+        }
+    }
+
+    fn next_line(&mut self) {
+        while let Some(&c) = self.input.peek() {
+            if c != '\n' {
+                self.advance();
+            } else {
+                self.line += 1;
                 break;
             }
         }
