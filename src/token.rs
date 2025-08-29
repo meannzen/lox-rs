@@ -1,6 +1,9 @@
 #[derive(Debug, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
+    pub literal: String,
+    pub line: usize,
+    pub column: usize,
 }
 
 #[derive(Debug, PartialEq)]
@@ -17,13 +20,7 @@ pub enum TokenKind {
     Semi,
     Slash,
     // add more token
-    Unknown,
-}
-
-impl Token {
-    pub fn new(kind: TokenKind) -> Self {
-        Token { kind }
-    }
+    Illegal,
 }
 
 impl std::fmt::Display for Token {
@@ -31,8 +28,8 @@ impl std::fmt::Display for Token {
         match self.kind {
             TokenKind::LeftParen => write!(f, "LEFT_PAREN ( null"),
             TokenKind::RightParen => write!(f, "RIGHT_PAREN ) null"),
-            TokenKind::LeftBrace => write!(f, "LEFT_BRACE {} null", "{"),
-            TokenKind::RightBrace => write!(f, "RIGHT_BRACE {} null", "}"),
+            TokenKind::LeftBrace => write!(f, "LEFT_BRACE {{ null"),
+            TokenKind::RightBrace => write!(f, "RIGHT_BRACE }} null"),
             TokenKind::Star => write!(f, "STAR * null"),
             TokenKind::Dot => write!(f, "DOT . null"),
             TokenKind::Comma => write!(f, "COMMA , null"),
@@ -40,7 +37,11 @@ impl std::fmt::Display for Token {
             TokenKind::Minus => write!(f, "MINUS - null"),
             TokenKind::Semi => write!(f, "SEMICOLON ; null"),
             TokenKind::Slash => write!(f, "SLASH / null"),
-            _ => unimplemented!(),
+            TokenKind::Illegal => write!(
+                f,
+                "[line {}] Error: Unexpected character: {}",
+                self.line, self.literal
+            ),
         }
     }
 }

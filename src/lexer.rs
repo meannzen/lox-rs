@@ -4,18 +4,37 @@ use crate::token::{Token, TokenKind};
 
 pub struct Lexer<'c> {
     input: Peekable<Chars<'c>>,
+    line: usize,
+    column: usize,
 }
 
 impl<'c> Lexer<'c> {
     pub fn new(input: &'c str) -> Self {
         Lexer {
             input: input.chars().peekable(),
+            line: 1,
+            column: 1,
         }
+    }
+
+    fn advance(&mut self) -> Option<char> {
+        let ch = self.input.next()?;
+        if ch == '\n' {
+            self.line += 1;
+            self.column = 1;
+        } else {
+            self.column += 1;
+        }
+        Some(ch)
     }
 
     fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
-        let ch = self.input.next()?;
+
+        let start_line = self.line;
+        let start_column = self.column;
+
+        let ch = self.advance()?;
 
         let kind = match ch {
             '(' => TokenKind::LeftParen,
@@ -29,16 +48,21 @@ impl<'c> Lexer<'c> {
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semi,
             '/' => TokenKind::Slash,
-            _ => unimplemented!(),
+            _ => TokenKind::Illegal,
         };
 
-        Some(Token { kind })
+        Some(Token {
+            kind,
+            literal: ch.to_string(),
+            line: start_line,
+            column: start_column,
+        })
     }
 
     fn skip_whitespace(&mut self) {
         while let Some(&c) = self.input.peek() {
             if c.is_ascii_whitespace() {
-                self.input.next();
+                self.advance();
             } else {
                 break;
             }
@@ -52,7 +76,6 @@ impl Iterator for Lexer<'_> {
         self.next_token()
     }
 }
-
 #[cfg(test)]
 mod tests {
     use crate::{Lexer, Token, TokenKind};
@@ -72,18 +95,32 @@ mod tests {
         let expected_tokens = vec![
             Token {
                 kind: TokenKind::LeftParen,
+                literal: "(".to_string(),
+                line: 1,
+                column: 2,
             },
             Token {
                 kind: TokenKind::LeftParen,
+                literal: "(".to_string(),
+                line: 1,
+                column: 4,
             },
             Token {
                 kind: TokenKind::RightParen,
+                literal: ")".to_string(),
+                line: 1,
+                column: 6,
             },
             Token {
                 kind: TokenKind::RightParen,
+                literal: ")".to_string(),
+                line: 1,
+                column: 8,
             },
         ];
 
+        // This line simplifies the token comparison.
+        // We'll create a new function to make sure it's possible.
         let actual_tokens: Vec<Token> = lexer.collect();
 
         assert_eq!(actual_tokens, expected_tokens);
@@ -97,15 +134,27 @@ mod tests {
         let expected_tokens = vec![
             Token {
                 kind: TokenKind::LeftBrace,
+                literal: "{".to_string(),
+                line: 1,
+                column: 2,
             },
             Token {
                 kind: TokenKind::LeftBrace,
+                literal: "{".to_string(),
+                line: 1,
+                column: 3,
             },
             Token {
                 kind: TokenKind::RightBrace,
+                literal: "}".to_string(),
+                line: 1,
+                column: 5,
             },
             Token {
                 kind: TokenKind::RightBrace,
+                literal: "}".to_string(),
+                line: 1,
+                column: 6,
             },
         ];
 
@@ -113,6 +162,7 @@ mod tests {
 
         assert_eq!(actual_tokens, expected_tokens);
     }
+
     #[test]
     fn scanning_symbols() {
         let input = "{*.,+*-/;})";
@@ -121,36 +171,94 @@ mod tests {
         let expected_tokens = vec![
             Token {
                 kind: TokenKind::LeftBrace,
+                literal: "{".to_string(),
+                line: 1,
+                column: 1,
             },
             Token {
                 kind: TokenKind::Star,
+                literal: "*".to_string(),
+                line: 1,
+                column: 2,
             },
             Token {
                 kind: TokenKind::Dot,
+                literal: ".".to_string(),
+                line: 1,
+                column: 3,
             },
             Token {
                 kind: TokenKind::Comma,
+                literal: ",".to_string(),
+                line: 1,
+                column: 4,
             },
             Token {
                 kind: TokenKind::Plus,
+                literal: "+".to_string(),
+                line: 1,
+                column: 5,
             },
             Token {
                 kind: TokenKind::Star,
+                literal: "*".to_string(),
+                line: 1,
+                column: 6,
             },
             Token {
                 kind: TokenKind::Minus,
+                literal: "-".to_string(),
+                line: 1,
+                column: 7,
             },
             Token {
                 kind: TokenKind::Slash,
+                literal: "/".to_string(),
+                line: 1,
+                column: 8,
             },
             Token {
                 kind: TokenKind::Semi,
+                literal: ";".to_string(),
+                line: 1,
+                column: 9,
             },
             Token {
                 kind: TokenKind::RightBrace,
+                literal: "}".to_string(),
+                line: 1,
+                column: 10,
             },
             Token {
                 kind: TokenKind::RightParen,
+                literal: ")".to_string(),
+                line: 1,
+                column: 11,
+            },
+        ];
+
+        let actual_tokens: Vec<Token> = lexer.collect();
+
+        assert_eq!(actual_tokens, expected_tokens);
+    }
+
+    #[test]
+    fn scanning_with_newline() {
+        let input = "{\n}";
+        let lexer = Lexer::new(input);
+
+        let expected_tokens = vec![
+            Token {
+                kind: TokenKind::LeftBrace,
+                literal: "{".to_string(),
+                line: 1,
+                column: 1,
+            },
+            Token {
+                kind: TokenKind::RightBrace,
+                literal: "}".to_string(),
+                line: 2,
+                column: 1,
             },
         ];
 
