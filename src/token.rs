@@ -21,6 +21,8 @@ pub enum TokenKind {
     Slash,
     Equal,
     EqualEqual,
+    Bang,
+    BangEqual,
     Illegal,
 }
 
@@ -40,6 +42,8 @@ impl std::fmt::Display for Token {
             TokenKind::Slash => write!(f, "SLASH / null"),
             TokenKind::Equal => write!(f, "EQUAL = null"),
             TokenKind::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
+            TokenKind::Bang => write!(f, "BANG ! null"),
+            TokenKind::BangEqual => write!(f, "BANG_EQUAL != null"),
             TokenKind::Illegal => write!(
                 f,
                 "[line {}] Error: Unexpected character: {}",
