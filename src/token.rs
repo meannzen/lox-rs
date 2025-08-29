@@ -23,6 +23,10 @@ pub enum TokenKind {
     EqualEqual,
     Bang,
     BangEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
     Illegal,
 }
 
@@ -44,6 +48,10 @@ impl std::fmt::Display for Token {
             TokenKind::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
             TokenKind::Bang => write!(f, "BANG ! null"),
             TokenKind::BangEqual => write!(f, "BANG_EQUAL != null"),
+            TokenKind::Less => write!(f, "LESS < null"),
+            TokenKind::LessEqual => write!(f, "LESS_EQUAL <= null"),
+            TokenKind::Greater => write!(f, "GREATER > null"),
+            TokenKind::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
             TokenKind::Illegal => write!(
                 f,
                 "[line {}] Error: Unexpected character: {}",

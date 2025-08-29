@@ -66,6 +66,22 @@ impl<'c> Lexer<'c> {
                     TokenKind::Bang
                 }
             }
+            '<' => {
+                if let Some(next_ch) = self.input.next_if_eq(&'=') {
+                    literal.push(next_ch);
+                    TokenKind::LessEqual
+                } else {
+                    TokenKind::Less
+                }
+            }
+            '>' => {
+                if let Some(next_ch) = self.input.next_if_eq(&'=') {
+                    literal.push(next_ch);
+                    TokenKind::GreaterEqual
+                } else {
+                    TokenKind::Greater
+                }
+            }
             _ => TokenKind::Illegal,
         };
 
@@ -285,7 +301,7 @@ mod tests {
 
     #[test]
     fn scanning_equal_bang() {
-        let input = "===!=!";
+        let input = "===!=!<<=>>=";
         let lexer = Lexer::new(input);
 
         let expected_tokens = vec![
@@ -312,6 +328,30 @@ mod tests {
                 literal: "!".to_string(),
                 line: 1,
                 column: 4,
+            },
+            Token {
+                kind: TokenKind::Less,
+                literal: "<".to_string(),
+                line: 1,
+                column: 5,
+            },
+            Token {
+                kind: TokenKind::LessEqual,
+                literal: "<=".to_string(),
+                line: 1,
+                column: 6,
+            },
+            Token {
+                kind: TokenKind::Greater,
+                literal: ">".to_string(),
+                line: 1,
+                column: 7,
+            },
+            Token {
+                kind: TokenKind::GreaterEqual,
+                literal: ">=".to_string(),
+                line: 1,
+                column: 8,
             },
         ];
 
