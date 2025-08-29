@@ -36,6 +36,8 @@ impl<'c> Lexer<'c> {
 
         let ch = self.advance()?;
 
+        let mut literal: String = ch.to_string();
+
         let kind = match ch {
             '(' => TokenKind::LeftParen,
             ')' => TokenKind::RightParen,
@@ -48,12 +50,20 @@ impl<'c> Lexer<'c> {
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semi,
             '/' => TokenKind::Slash,
+            '=' => {
+                if let Some(next_ch) = self.input.next_if_eq(&'=') {
+                    literal.push(next_ch);
+                    TokenKind::EqualEqual
+                } else {
+                    TokenKind::Equal
+                }
+            }
             _ => TokenKind::Illegal,
         };
 
         Some(Token {
             kind,
-            literal: ch.to_string(),
+            literal,
             line: start_line,
             column: start_column,
         })
@@ -119,8 +129,6 @@ mod tests {
             },
         ];
 
-        // This line simplifies the token comparison.
-        // We'll create a new function to make sure it's possible.
         let actual_tokens: Vec<Token> = lexer.collect();
 
         assert_eq!(actual_tokens, expected_tokens);
@@ -259,6 +267,31 @@ mod tests {
                 literal: "}".to_string(),
                 line: 2,
                 column: 1,
+            },
+        ];
+
+        let actual_tokens: Vec<Token> = lexer.collect();
+
+        assert_eq!(actual_tokens, expected_tokens);
+    }
+
+    #[test]
+    fn scanning_equal_and_equal_equal() {
+        let input = "===";
+        let lexer = Lexer::new(input);
+
+        let expected_tokens = vec![
+            Token {
+                kind: TokenKind::EqualEqual,
+                literal: "==".to_string(),
+                line: 1,
+                column: 1,
+            },
+            Token {
+                kind: TokenKind::Equal,
+                literal: "=".to_string(),
+                line: 1,
+                column: 2,
             },
         ];
 

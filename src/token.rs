@@ -19,7 +19,8 @@ pub enum TokenKind {
     Minus,
     Semi,
     Slash,
-    // add more token
+    Equal,
+    EqualEqual,
     Illegal,
 }
 
@@ -37,6 +38,8 @@ impl std::fmt::Display for Token {
             TokenKind::Minus => write!(f, "MINUS - null"),
             TokenKind::Semi => write!(f, "SEMICOLON ; null"),
             TokenKind::Slash => write!(f, "SLASH / null"),
+            TokenKind::Equal => write!(f, "EQUAL = null"),
+            TokenKind::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
             TokenKind::Illegal => write!(
                 f,
                 "[line {}] Error: Unexpected character: {}",
