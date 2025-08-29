@@ -27,12 +27,19 @@ pub enum TokenKind {
     LessEqual,
     Greater,
     GreaterEqual,
-    Illegal,
+    String,
+    Illegal(IlligalType),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum IlligalType {
+    Unexpected,
+    UnterminatedString,
 }
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
+        match &self.kind {
             TokenKind::LeftParen => write!(f, "LEFT_PAREN ( null"),
             TokenKind::RightParen => write!(f, "RIGHT_PAREN ) null"),
             TokenKind::LeftBrace => write!(f, "LEFT_BRACE {{ null"),
@@ -52,11 +59,15 @@ impl std::fmt::Display for Token {
             TokenKind::LessEqual => write!(f, "LESS_EQUAL <= null"),
             TokenKind::Greater => write!(f, "GREATER > null"),
             TokenKind::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
-            TokenKind::Illegal => write!(
-                f,
-                "[line {}] Error: Unexpected character: {}",
-                self.line, self.literal
-            ),
+            TokenKind::String => write!(f, "STRING \"{}\" {}", self.literal, self.literal),
+            TokenKind::Illegal(ty) => {
+                let word = match ty {
+                    IlligalType::UnterminatedString => "Unterminated string .".to_string(),
+                    IlligalType::Unexpected => format!("Unexpected character: {}", self.literal),
+                };
+
+                write!(f, "[line {}] Error: {}", self.line, word)
+            }
         }
     }
 }

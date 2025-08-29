@@ -50,7 +50,7 @@ impl<'c> Lexer<'c> {
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semi,
             '/' => {
-                if let Some(_) = self.input.next_if_eq(&'/') {
+                if self.input.next_if_eq(&'/').is_some() {
                     self.next_line();
                     return self.next_token();
                 } else {
@@ -89,7 +89,24 @@ impl<'c> Lexer<'c> {
                     TokenKind::Greater
                 }
             }
-            _ => TokenKind::Illegal,
+            '"' => {
+                literal = String::new();
+                let mut found_closing_quote = false;
+                while let Some(c) = self.advance() {
+                    if c == '"' {
+                        found_closing_quote = true;
+                        break;
+                    }
+                    literal.push(c);
+                }
+
+                if found_closing_quote {
+                    TokenKind::String
+                } else {
+                    TokenKind::Illegal(crate::IlligalType::UnterminatedString)
+                }
+            }
+            _ => TokenKind::Illegal(crate::IlligalType::Unexpected),
         };
 
         Some(Token {

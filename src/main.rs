@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use codecrafters_interpreter::{Lexer, TokenKind};
+use codecrafters_interpreter::{IlligalType, Lexer, TokenKind};
 use std::{path::PathBuf, process};
 
 #[derive(Debug, Parser)]
@@ -24,12 +24,19 @@ fn main() -> codecrafters_interpreter::Result<()> {
             let tokens: Vec<_> = lexer.collect();
 
             for token in &tokens {
-                if token.kind == TokenKind::Illegal {
+                if let TokenKind::Illegal(ty) = &token.kind {
                     has_error_token = true;
-                    eprintln!(
-                        "[line {}] Error: Unexpected character: {}",
-                        token.line, token.literal
-                    );
+                    match ty {
+                        IlligalType::UnterminatedString => {
+                            eprintln!("[line {}] Error: Unterminated string.", token.line);
+                        }
+                        IlligalType::Unexpected => {
+                            eprintln!(
+                                "[line {}] Error: Unexpected character: {}",
+                                token.line, token.literal
+                            );
+                        }
+                    }
                 } else {
                     println!("{}", token);
                 }
