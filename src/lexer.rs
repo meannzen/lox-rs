@@ -22,6 +22,13 @@ impl<'c> Lexer<'c> {
             ')' => TokenKind::RightParen,
             '{' => TokenKind::LeftBrace,
             '}' => TokenKind::RightBrace,
+            '*' => TokenKind::Star,
+            '.' => TokenKind::Dot,
+            ',' => TokenKind::Comma,
+            '+' => TokenKind::Plus,
+            '-' => TokenKind::Minus,
+            ';' => TokenKind::Semi,
+            '/' => TokenKind::Slash,
             _ => unimplemented!(),
         };
 
@@ -99,6 +106,51 @@ mod tests {
             },
             Token {
                 kind: TokenKind::RightBrace,
+            },
+        ];
+
+        let actual_tokens: Vec<Token> = lexer.collect();
+
+        assert_eq!(actual_tokens, expected_tokens);
+    }
+    #[test]
+    fn scanning_symbols() {
+        let input = "{*.,+*-/;})";
+        let lexer = Lexer::new(input);
+
+        let expected_tokens = vec![
+            Token {
+                kind: TokenKind::LeftBrace,
+            },
+            Token {
+                kind: TokenKind::Star,
+            },
+            Token {
+                kind: TokenKind::Dot,
+            },
+            Token {
+                kind: TokenKind::Comma,
+            },
+            Token {
+                kind: TokenKind::Plus,
+            },
+            Token {
+                kind: TokenKind::Star,
+            },
+            Token {
+                kind: TokenKind::Minus,
+            },
+            Token {
+                kind: TokenKind::Slash,
+            },
+            Token {
+                kind: TokenKind::Semi,
+            },
+            Token {
+                kind: TokenKind::RightBrace,
+            },
+            Token {
+                kind: TokenKind::RightParen,
             },
         ];
 
