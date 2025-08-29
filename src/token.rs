@@ -7,6 +7,8 @@ pub struct Token {
 pub enum TokenKind {
     LeftParen,
     RightParen,
+    LeftBrace,
+    RightBrace,
 }
 
 impl Token {
@@ -20,6 +22,8 @@ impl std::fmt::Display for Token {
         match self.kind {
             TokenKind::LeftParen => write!(f, "LEFT_PAREN ( null"),
             TokenKind::RightParen => write!(f, "RIGHT_PAREN ) null"),
+            TokenKind::LeftBrace => write!(f, "LEFT_BRACE {} null", "{"),
+            TokenKind::RightBrace => write!(f, "RIGHT_BRACE {} null", "}"),
         }
     }
 }

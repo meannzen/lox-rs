@@ -20,6 +20,8 @@ impl<'c> Lexer<'c> {
         let kind = match ch {
             '(' => TokenKind::LeftParen,
             ')' => TokenKind::RightParen,
+            '{' => TokenKind::LeftBrace,
+            '}' => TokenKind::RightBrace,
             _ => unimplemented!(),
         };
 
@@ -72,6 +74,31 @@ mod tests {
             },
             Token {
                 kind: TokenKind::RightParen,
+            },
+        ];
+
+        let actual_tokens: Vec<Token> = lexer.collect();
+
+        assert_eq!(actual_tokens, expected_tokens);
+    }
+
+    #[test]
+    fn scanning_brace() {
+        let input = " {{ }} ";
+        let lexer = Lexer::new(input);
+
+        let expected_tokens = vec![
+            Token {
+                kind: TokenKind::LeftBrace,
+            },
+            Token {
+                kind: TokenKind::LeftBrace,
+            },
+            Token {
+                kind: TokenKind::RightBrace,
+            },
+            Token {
+                kind: TokenKind::RightBrace,
             },
         ];
 
