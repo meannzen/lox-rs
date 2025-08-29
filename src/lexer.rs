@@ -115,7 +115,6 @@ impl<'c> Lexer<'c> {
             if c != '\n' {
                 self.advance();
             } else {
-                self.line += 1;
                 break;
             }
         }
