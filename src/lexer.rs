@@ -154,7 +154,25 @@ impl<'c> Lexer<'c> {
                         break;
                     }
                 }
-                TokenKind::Identifier
+                match literal.as_str() {
+                    "and" => TokenKind::And,
+                    "class" => TokenKind::Class,
+                    "else" => TokenKind::Else,
+                    "false" => TokenKind::False,
+                    "for" => TokenKind::For,
+                    "fun" => TokenKind::Fun,
+                    "if" => TokenKind::If,
+                    "nil" => TokenKind::Nil,
+                    "or" => TokenKind::Or,
+                    "print" => TokenKind::Print,
+                    "return" => TokenKind::Return,
+                    "super" => TokenKind::Super,
+                    "this" => TokenKind::This,
+                    "true" => TokenKind::True,
+                    "var" => TokenKind::Var,
+                    "while" => TokenKind::While,
+                    _ => TokenKind::Identifier,
+                }
             }
             _ => TokenKind::Illegal(crate::IlligalType::Unexpected),
         };
