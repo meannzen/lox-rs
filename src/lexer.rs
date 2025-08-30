@@ -106,6 +106,42 @@ impl<'c> Lexer<'c> {
                     TokenKind::Illegal(crate::IlligalType::UnterminatedString)
                 }
             }
+            '0'..='9' => {
+                let mut number = String::from(ch);
+                while let Some(&c) = self.input.peek() {
+                    if c.is_ascii_digit() {
+                        number.push(c);
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                let mut temp_input = self.input.clone();
+                if temp_input.next_if_eq(&'.').is_some() {
+                    if let Some(c) = temp_input.next() {
+                        if c.is_ascii_digit() {
+                            self.advance();
+                        }
+                    }
+                    let mut next_number = String::new();
+                    while let Some(&c) = self.input.peek() {
+                        if c.is_ascii_digit() {
+                            next_number.push(c);
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if !next_number.is_empty() {
+                        number.push('.');
+                        number.push_str(&next_number);
+                    }
+                }
+                let num: f64 = number.parse().unwrap();
+                literal = number;
+                TokenKind::Number(num)
+            }
             _ => TokenKind::Illegal(crate::IlligalType::Unexpected),
         };
 

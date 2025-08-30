@@ -28,6 +28,7 @@ pub enum TokenKind {
     Greater,
     GreaterEqual,
     String,
+    Number(f64),
     Illegal(IlligalType),
 }
 
@@ -60,6 +61,13 @@ impl std::fmt::Display for Token {
             TokenKind::Greater => write!(f, "GREATER > null"),
             TokenKind::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
             TokenKind::String => write!(f, "STRING \"{}\" {}", self.literal, self.literal),
+            TokenKind::Number(num) => {
+                if num.fract() == 0.0 {
+                    write!(f, "NUMBER {} {:.1}", self.literal, num)
+                } else {
+                    write!(f, "NUMBER {} {num}", self.literal)
+                }
+            }
             TokenKind::Illegal(ty) => {
                 let word = match ty {
                     IlligalType::UnterminatedString => "Unterminated string .".to_string(),
