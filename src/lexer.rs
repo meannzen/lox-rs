@@ -142,6 +142,20 @@ impl<'c> Lexer<'c> {
                 literal = number;
                 TokenKind::Number(num)
             }
+            'a'..='z' | 'A'..='Z' | '_' => {
+                while let Some(&next) = self.input.peek() {
+                    if !next.is_whitespace() || next.is_ascii_digit() || next == '_' {
+                        if next.is_ascii_punctuation() && next != '_' {
+                            break;
+                        }
+                        literal.push(next);
+                        self.advance();
+                    } else {
+                        break;
+                    }
+                }
+                TokenKind::Identifier
+            }
             _ => TokenKind::Illegal(crate::IlligalType::Unexpected),
         };
 
