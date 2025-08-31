@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub literal: String,
@@ -6,7 +6,7 @@ pub struct Token {
     pub column: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
     LeftParen,
     RightParen,
@@ -49,7 +49,7 @@ pub enum TokenKind {
     Illegal(IlligalType),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum IlligalType {
     Unexpected,
     UnterminatedString,
