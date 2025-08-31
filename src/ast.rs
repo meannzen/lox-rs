@@ -30,7 +30,7 @@ impl std::fmt::Display for Literal {
                 }
             }
             Literal::Boolean(value) => write!(f, "{value}"),
-            Literal::String(s) => write!(f, "\"{}\"", s),
+            Literal::String(s) => write!(f, "{s}"),
             Literal::Nil => write!(f, "nil"),
         }
     }
