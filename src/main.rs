@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use codecrafters_interpreter::{Expression, IlligalType, Lexer, TokenKind};
+use codecrafters_interpreter::{IlligalType, Lexer, TokenKind};
 use std::{path::PathBuf, process};
 
 #[derive(Debug, Parser)]

@@ -18,7 +18,7 @@ impl<'input> Parser<'input> {
     }
 
     pub fn expression(&mut self) -> Option<Expression> {
-        self.primary()
+        self.equality()
     }
 
     fn peak(&mut self) -> Option<&Token> {
@@ -36,6 +36,37 @@ impl<'input> Parser<'input> {
 
     fn advance(&mut self) -> Option<Token> {
         self.tokens.next()
+    }
+
+    fn equality(&mut self) -> Option<Expression> {
+        self.comparison()
+    }
+
+    fn comparison(&mut self) -> Option<Expression> {
+        self.term()
+    }
+
+    fn term(&mut self) -> Option<Expression> {
+        self.factor()
+    }
+
+    fn factor(&mut self) -> Option<Expression> {
+        self.unary()
+    }
+
+    fn unary(&mut self) -> Option<Expression> {
+        if let Some(token) = self.peak() {
+            if matches!(token.kind, TokenKind::Bang | TokenKind::Minus) {
+                let operator = self.advance()?;
+                let expression = self.unary()?;
+                return Some(Expression::Unary {
+                    operator: operator.kind,
+                    expression: Box::new(expression),
+                });
+            }
+        }
+
+        self.primary()
     }
 
     fn primary(&mut self) -> Option<Expression> {

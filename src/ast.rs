@@ -115,7 +115,18 @@ impl std::fmt::Display for Expression {
                     write!(f, "{} {} {}", left, op_str, right)
                 }
             }
-            _ => unimplemented!(),
+            Expression::Unary {
+                operator,
+                expression,
+            } => {
+                let op = match operator {
+                    TokenKind::Bang => "!",
+                    TokenKind::Minus => "-",
+                    _ => unimplemented!(),
+                };
+
+                write!(f, "({op} {expression})")
+            }
         }
     }
 }
