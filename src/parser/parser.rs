@@ -25,6 +25,15 @@ impl<'input> Parser<'input> {
         self.tokens.peek()
     }
 
+    fn consume(&mut self, expected: TokenKind) -> Option<Token> {
+        if let Some(token) = self.peak() {
+            if token.kind == expected {
+                return Some(self.advance().unwrap());
+            }
+        }
+        None
+    }
+
     fn advance(&mut self) -> Option<Token> {
         self.tokens.next()
     }
@@ -39,6 +48,11 @@ impl<'input> Parser<'input> {
             TokenKind::String => Some(Expression::Literal(crate::ast::Literal::String(
                 token.literal,
             ))),
+            TokenKind::LeftParen => {
+                let expression = self.expression()?;
+                self.consume(TokenKind::RightParen)?;
+                Some(Expression::Group(Box::new(expression)))
+            }
 
             _ => None,
         }

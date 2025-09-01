@@ -54,15 +54,7 @@ fn main() -> codecrafters_interpreter::Result<()> {
             let mut parser = codecrafters_interpreter::Parser::new(&file_content);
 
             let result = parser.parse().unwrap();
-            match result {
-                Expression::Literal(l) => {
-                    println!("{}", l);
-                }
-
-                _ => {
-                    todo!()
-                }
-            }
+            println!("{result}");
         }
     }
     Ok(())
