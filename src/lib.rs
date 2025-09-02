@@ -8,5 +8,5 @@ mod token;
 
 pub use ast::*;
 pub use lexer::Lexer;
-pub use parser::*;
+pub use parser::Parser;
 pub use token::*;

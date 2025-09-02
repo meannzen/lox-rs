@@ -7,7 +7,6 @@ pub enum Expression {
         operator: TokenKind,
         right: Box<Expression>,
     },
-
     Literal(Literal),
     Unary {
         operator: TokenKind,
@@ -64,56 +63,7 @@ impl std::fmt::Display for Expression {
                     TokenKind::LessEqual => "<=",
                     _ => unimplemented!(),
                 };
-                let needs_parens = matches!(
-                    operator,
-                    TokenKind::BangEqual
-                        | TokenKind::EqualEqual
-                        | TokenKind::Greater
-                        | TokenKind::GreaterEqual
-                        | TokenKind::Less
-                        | TokenKind::LessEqual
-                        | TokenKind::Plus
-                        | TokenKind::Minus
-                );
-                let left_needs_parens = needs_parens
-                    && matches!(
-                        left.as_ref(),
-                        Expression::Binary {
-                            operator: TokenKind::Star
-                                | TokenKind::Slash
-                                | TokenKind::Plus
-                                | TokenKind::Minus
-                                | TokenKind::Greater
-                                | TokenKind::GreaterEqual
-                                | TokenKind::Less
-                                | TokenKind::LessEqual,
-                            ..
-                        }
-                    );
-                let right_needs_parens = needs_parens
-                    && matches!(
-                        right.as_ref(),
-                        Expression::Binary {
-                            operator: TokenKind::Star
-                                | TokenKind::Slash
-                                | TokenKind::Plus
-                                | TokenKind::Minus
-                                | TokenKind::Greater
-                                | TokenKind::GreaterEqual
-                                | TokenKind::Less
-                                | TokenKind::LessEqual,
-                            ..
-                        }
-                    );
-                if left_needs_parens && right_needs_parens {
-                    write!(f, "({}) {} ({})", left, op_str, right)
-                } else if left_needs_parens {
-                    write!(f, "({}) {} {}", left, op_str, right)
-                } else if right_needs_parens {
-                    write!(f, "{} {} ({})", left, op_str, right)
-                } else {
-                    write!(f, "{} {} {}", left, op_str, right)
-                }
+                write!(f, "({} {} {})", op_str, left, right)
             }
             Expression::Unary {
                 operator,
@@ -124,8 +74,7 @@ impl std::fmt::Display for Expression {
                     TokenKind::Minus => "-",
                     _ => unimplemented!(),
                 };
-
-                write!(f, "({op} {expression})")
+                write!(f, "({} {})", op, expression)
             }
         }
     }
