@@ -1,6 +1,6 @@
 use std::iter::Peekable;
 
-use crate::{ast::Expression, Lexer, Token, TokenKind};
+use crate::{ast::Expression, Lexer, ParserError, Token, TokenKind};
 
 pub struct Parser<'input> {
     tokens: Peekable<Lexer<'input>>,
@@ -13,20 +13,20 @@ impl<'input> Parser<'input> {
         }
     }
 
-    pub fn parse(&mut self) -> Option<Expression> {
+    pub fn parse(&mut self) -> Result<Expression, ParserError> {
         self.expression()
     }
 
-    fn expression(&mut self) -> Option<Expression> {
+    fn expression(&mut self) -> Result<Expression, ParserError> {
         self.equality()
     }
 
-    fn equality(&mut self) -> Option<Expression> {
+    fn equality(&mut self) -> Result<Expression, ParserError> {
         let mut expr = self.comparison()?;
         while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::EqualEqual | TokenKind::BangEqual => {
-                    let operator = self.advance()?;
+                    let operator = self.advance().unwrap();
                     let right = self.comparison()?;
                     expr = Expression::Binary {
                         left: Box::new(expr),
@@ -37,10 +37,10 @@ impl<'input> Parser<'input> {
                 _ => break,
             }
         }
-        Some(expr)
+        Ok(expr)
     }
 
-    fn comparison(&mut self) -> Option<Expression> {
+    fn comparison(&mut self) -> Result<Expression, ParserError> {
         let mut expr = self.term()?;
         while let Some(token) = self.peek() {
             match token.kind {
@@ -48,7 +48,7 @@ impl<'input> Parser<'input> {
                 | TokenKind::GreaterEqual
                 | TokenKind::Less
                 | TokenKind::LessEqual => {
-                    let operator = self.advance()?;
+                    let operator = self.advance().unwrap();
                     let right = self.term()?;
                     expr = Expression::Binary {
                         left: Box::new(expr),
@@ -59,15 +59,15 @@ impl<'input> Parser<'input> {
                 _ => break,
             }
         }
-        Some(expr)
+        Ok(expr)
     }
 
-    fn term(&mut self) -> Option<Expression> {
+    fn term(&mut self) -> Result<Expression, ParserError> {
         let mut expr = self.factor()?;
         while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::Plus | TokenKind::Minus => {
-                    let operator = self.advance()?;
+                    let operator = self.advance().unwrap();
                     let right = self.factor()?;
                     expr = Expression::Binary {
                         left: Box::new(expr),
@@ -78,15 +78,15 @@ impl<'input> Parser<'input> {
                 _ => break,
             }
         }
-        Some(expr)
+        Ok(expr)
     }
 
-    fn factor(&mut self) -> Option<Expression> {
+    fn factor(&mut self) -> Result<Expression, ParserError> {
         let mut expr = self.unary()?;
         while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::Star | TokenKind::Slash => {
-                    let operator = self.advance()?;
+                    let operator = self.advance().unwrap();
                     let right = self.unary()?;
                     expr = Expression::Binary {
                         left: Box::new(expr),
@@ -97,15 +97,15 @@ impl<'input> Parser<'input> {
                 _ => break,
             }
         }
-        Some(expr)
+        Ok(expr)
     }
 
-    fn unary(&mut self) -> Option<Expression> {
+    fn unary(&mut self) -> Result<Expression, ParserError> {
         if let Some(token) = self.peek() {
             if matches!(token.kind, TokenKind::Bang | TokenKind::Minus) {
-                let operator = self.advance()?;
+                let operator = self.advance().unwrap();
                 let expression = self.unary()?;
-                return Some(Expression::Unary {
+                return Ok(Expression::Unary {
                     operator: operator.kind,
                     expression: Box::new(expression),
                 });
@@ -114,22 +114,28 @@ impl<'input> Parser<'input> {
         self.primary()
     }
 
-    fn primary(&mut self) -> Option<Expression> {
-        let token = self.advance()?;
+    fn primary(&mut self) -> Result<Expression, ParserError> {
+        let token = match self.advance() {
+            Some(token) => token,
+            _ => return Err(ParserError::UnexpectedEof { line: 1 }),
+        };
         match token.kind {
-            TokenKind::Number(n) => Some(Expression::Literal(crate::ast::Literal::Number(n))),
-            TokenKind::String => Some(Expression::Literal(crate::ast::Literal::String(
+            TokenKind::Number(n) => Ok(Expression::Literal(crate::ast::Literal::Number(n))),
+            TokenKind::String => Ok(Expression::Literal(crate::ast::Literal::String(
                 token.literal,
             ))),
-            TokenKind::True => Some(Expression::Literal(crate::ast::Literal::Boolean(true))),
-            TokenKind::False => Some(Expression::Literal(crate::ast::Literal::Boolean(false))),
-            TokenKind::Nil => Some(Expression::Literal(crate::ast::Literal::Nil)),
+            TokenKind::True => Ok(Expression::Literal(crate::ast::Literal::Boolean(true))),
+            TokenKind::False => Ok(Expression::Literal(crate::ast::Literal::Boolean(false))),
+            TokenKind::Nil => Ok(Expression::Literal(crate::ast::Literal::Nil)),
             TokenKind::LeftParen => {
                 let expression = self.expression()?;
                 self.consume(TokenKind::RightParen)?;
-                Some(Expression::Group(Box::new(expression)))
+                Ok(Expression::Group(Box::new(expression)))
             }
-            _ => None,
+            _ => Err(ParserError::UnexpectedToken {
+                line: token.line,
+                token: token.literal,
+            }),
         }
     }
 
@@ -137,13 +143,15 @@ impl<'input> Parser<'input> {
         self.tokens.peek()
     }
 
-    fn consume(&mut self, expected: TokenKind) -> Option<Token> {
+    fn consume(&mut self, expected: TokenKind) -> Result<Token, ParserError> {
+        let mut line: usize = 1;
         if let Some(token) = self.peek() {
+            line = token.line;
             if token.kind == expected {
-                return self.advance();
+                return Ok(self.advance().unwrap());
             }
         }
-        None
+        Err(ParserError::UnexpectedEof { line })
     }
 
     fn advance(&mut self) -> Option<Token> {

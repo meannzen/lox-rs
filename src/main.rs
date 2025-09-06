@@ -53,8 +53,15 @@ fn main() -> codecrafters_interpreter::Result<()> {
             let file_content = std::fs::read_to_string(filename)?;
             let mut parser = codecrafters_interpreter::Parser::new(&file_content);
 
-            let result = parser.parse().unwrap();
-            println!("{result}");
+            match parser.parse() {
+                Ok(rersult) => {
+                    println!("{rersult}");
+                }
+                Err(err) => {
+                    eprintln!("{err}");
+                    process::exit(65);
+                }
+            }
         }
     }
     Ok(())
