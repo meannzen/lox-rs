@@ -73,8 +73,8 @@ impl Visitor<Value> for Interpreter {
                 let left = self.visit_expr(left);
                 let right = self.visit_expr(right);
                 match (left, operator, right) {
-                    (Value::Number(n), TokenKind::And, Value::Number(n1)) => Value::Number(n + n1),
-                    (Value::String(s), TokenKind::And, Value::String(s1)) => {
+                    (Value::Number(n), TokenKind::Plus, Value::Number(n1)) => Value::Number(n + n1),
+                    (Value::String(s), TokenKind::Plus, Value::String(s1)) => {
                         let s = format!("{s}{s1}");
                         Value::String(s)
                     }
@@ -86,7 +86,10 @@ impl Visitor<Value> for Interpreter {
                         Value::Number(n / n1)
                     }
 
-                    _ => panic!("No support fucking op"),
+                    op => {
+                        println!("{:?}", op);
+                        panic!("No support fucking op")
+                    }
                 }
             }
             _ => self.visit_expr(expr),
