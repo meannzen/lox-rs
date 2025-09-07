@@ -47,8 +47,20 @@ impl Visitor<Value> for Interpreter {
         }
     }
 
-    fn visit_unary_expr(&mut self, expr: &Expression, _op: &TokenKind) -> Value {
-        self.visit_expr(expr)
+    fn visit_unary_expr(&mut self, expr: &Expression, op: &TokenKind) -> Value {
+        let value = self.visit_expr(expr);
+        match (op, value.clone()) {
+            (TokenKind::Minus, val) => match val {
+                Value::Number(v) => Value::Number(-v),
+                _ => panic!("Error wtf"),
+            },
+            (TokenKind::Bang, val) => match val {
+                Value::Boolean(v) => Value::Boolean(!v),
+                Value::Nil => Value::Boolean(true),
+                _ => Value::Boolean(false),
+            },
+            _ => value,
+        }
     }
 }
 
