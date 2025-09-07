@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use codecrafters_interpreter::{IlligalType, Lexer, TokenKind};
+use codecrafters_interpreter::{IlligalType, Interpreter, Lexer, TokenKind};
 use std::{path::PathBuf, process};
 
 #[derive(Debug, Parser)]
@@ -12,6 +12,7 @@ struct Cli {
 enum Command {
     Tokenize { filename: PathBuf },
     Parse { filename: PathBuf },
+    Evaluate { filename: PathBuf },
 }
 
 fn main() -> codecrafters_interpreter::Result<()> {
@@ -56,6 +57,20 @@ fn main() -> codecrafters_interpreter::Result<()> {
             match parser.parse() {
                 Ok(rersult) => {
                     println!("{rersult}");
+                }
+                Err(err) => {
+                    eprintln!("{err}");
+                    process::exit(65);
+                }
+            }
+        }
+        Command::Evaluate { filename } => {
+            let file_content = std::fs::read_to_string(filename)?;
+            let mut parser = codecrafters_interpreter::Parser::new(&file_content);
+
+            match parser.parse() {
+                Ok(expr) => {
+                    Interpreter::run(expr).unwrap();
                 }
                 Err(err) => {
                     eprintln!("{err}");
