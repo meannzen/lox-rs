@@ -1,4 +1,4 @@
-use crate::{Expression, Literal, Visitor};
+use crate::{Expression, Literal, TokenKind, Visitor};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -30,6 +30,11 @@ impl Visitor<Value> for Interpreter {
     fn visit_expr(&mut self, expr: &crate::Expression) -> Value {
         match expr {
             Expression::Literal(literal) => self.visit_literal_expr(literal),
+            Expression::Unary {
+                operator,
+                expression,
+            } => self.visit_unary_expr(expression, operator),
+            Expression::Group(expr) => self.visit_expr(expr),
             _ => unimplemented!(),
         }
     }
@@ -40,6 +45,10 @@ impl Visitor<Value> for Interpreter {
             Literal::Nil => Value::Nil,
             Literal::String(v) => Value::String(v.clone()),
         }
+    }
+
+    fn visit_unary_expr(&mut self, expr: &Expression, _op: &TokenKind) -> Value {
+        self.visit_expr(expr)
     }
 }
 
