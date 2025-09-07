@@ -35,7 +35,7 @@ impl Visitor<Value> for Interpreter {
                 expression,
             } => self.visit_unary_expr(expression, operator),
             Expression::Group(expr) => self.visit_expr(expr),
-            _ => unimplemented!(),
+            _ => self.visit_binary_expr(expr),
         }
     }
     fn visit_literal_expr(&mut self, literal: &crate::Literal) -> Value {
@@ -60,6 +60,36 @@ impl Visitor<Value> for Interpreter {
                 _ => Value::Boolean(false),
             },
             _ => value,
+        }
+    }
+
+    fn visit_binary_expr(&mut self, expr: &Expression) -> Value {
+        match expr {
+            Expression::Binary {
+                left,
+                operator,
+                right,
+            } => {
+                let left = self.visit_expr(left);
+                let right = self.visit_expr(right);
+                match (left, operator, right) {
+                    (Value::Number(n), TokenKind::And, Value::Number(n1)) => Value::Number(n + n1),
+                    (Value::String(s), TokenKind::And, Value::String(s1)) => {
+                        let s = format!("{s}{s1}");
+                        Value::String(s)
+                    }
+                    (Value::Number(n), TokenKind::Minus, Value::Number(n1)) => {
+                        Value::Number(n - n1)
+                    }
+                    (Value::Number(n), TokenKind::Star, Value::Number(n1)) => Value::Number(n * n1),
+                    (Value::Number(n), TokenKind::Slash, Value::Number(n1)) => {
+                        Value::Number(n / n1)
+                    }
+
+                    _ => panic!("No support fucking op"),
+                }
+            }
+            _ => self.visit_expr(expr),
         }
     }
 }
