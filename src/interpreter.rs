@@ -5,6 +5,7 @@ pub enum Value {
     Number(f64),
     Boolean(bool),
     Nil,
+    String(String),
 }
 
 #[derive(Debug)]
@@ -33,11 +34,11 @@ impl Visitor<Value> for Interpreter {
         }
     }
     fn visit_literal_expr(&mut self, literal: &crate::Literal) -> Value {
-        match *literal {
-            Literal::Number(v) => Value::Number(v),
-            Literal::Boolean(v) => Value::Boolean(v),
+        match literal {
+            Literal::Number(v) => Value::Number(*v),
+            Literal::Boolean(v) => Value::Boolean(*v),
             Literal::Nil => Value::Nil,
-            _ => unimplemented!(),
+            Literal::String(v) => Value::String(v.clone()),
         }
     }
 }
@@ -56,6 +57,7 @@ impl std::fmt::Display for Value {
             Value::Number(v) => write!(f, "{v}"),
             Value::Boolean(v) => write!(f, "{v}"),
             Value::Nil => write!(f, "nil"),
+            Value::String(v) => write!(f, "{v}"),
         }
     }
 }
