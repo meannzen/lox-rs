@@ -85,6 +85,20 @@ impl Visitor<Value> for Interpreter {
                     (Value::Number(n), TokenKind::Slash, Value::Number(n1)) => {
                         Value::Number(n / n1)
                     }
+                    (Value::Number(n), TokenKind::Greater, Value::Number(n1)) => {
+                        Value::Boolean(n > n1)
+                    }
+                    (Value::Number(n), TokenKind::Less, Value::Number(n1)) => {
+                        Value::Boolean(n < n1)
+                    }
+
+                    (Value::Number(n), TokenKind::GreaterEqual, Value::Number(n1)) => {
+                        Value::Boolean(n >= n1)
+                    }
+
+                    (Value::Number(n), TokenKind::LessEqual, Value::Number(n1)) => {
+                        Value::Boolean(n <= n1)
+                    }
 
                     op => {
                         println!("{:?}", op);
