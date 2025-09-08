@@ -99,7 +99,27 @@ impl Visitor<Value> for Interpreter {
                     (Value::Number(n), TokenKind::LessEqual, Value::Number(n1)) => {
                         Value::Boolean(n <= n1)
                     }
-
+                    (Value::Number(n), TokenKind::EqualEqual, Value::Number(n1)) => {
+                        Value::Boolean(n == n1)
+                    }
+                    (Value::Number(n), TokenKind::BangEqual, Value::Number(n1)) => {
+                        Value::Boolean(n != n1)
+                    }
+                    (Value::String(s), op, Value::String(s2)) => match op {
+                        TokenKind::EqualEqual => Value::Boolean(s == s2),
+                        TokenKind::BangEqual => Value::Boolean(s != s2),
+                        _ => panic!("I'm not Implement yet , Please contact to FBI"),
+                    },
+                    (Value::Number(_), op, Value::String(_)) => match op {
+                        TokenKind::EqualEqual => Value::Boolean(false),
+                        TokenKind::BangEqual => Value::Boolean(true),
+                        _ => panic!("I'm not Implement yet , Please contact to FBI"),
+                    },
+                    (Value::String(_), op, Value::Number(_)) => match op {
+                        TokenKind::EqualEqual => Value::Boolean(false),
+                        TokenKind::BangEqual => Value::Boolean(true),
+                        _ => panic!("I'm not Implement yet , Please contact to FBI"),
+                    },
                     op => {
                         println!("{:?}", op);
                         panic!("No support fucking op")
