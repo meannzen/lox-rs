@@ -11,6 +11,7 @@ pub enum Value {
 #[derive(Debug)]
 pub enum InterpreterError {
     Unary,
+    Binary,
 }
 
 pub struct Interpreter;
@@ -135,7 +136,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                     (Value::String(_), TokenKind::BangEqual, Value::Number(_)) => {
                         Ok(Value::Boolean(true))
                     }
-                    _ => panic!("Unsupported operation"),
+                    _ => Err(InterpreterError::Binary),
                 }
             }
             _ => self.visit_expr(expr),
@@ -146,7 +147,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
 impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InterpreterError::Unary => {
+            _ => {
                 write!(f, "Operand must be a number.")
             }
         }
