@@ -69,9 +69,13 @@ fn main() -> codecrafters_interpreter::Result<()> {
             let mut parser = codecrafters_interpreter::Parser::new(&file_content);
 
             match parser.parse() {
-                Ok(expr) => {
-                    Interpreter::run(expr).unwrap();
-                }
+                Ok(expr) => match Interpreter::run(expr) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(70);
+                    }
+                },
                 Err(err) => {
                     eprintln!("{err}");
                     process::exit(65);
