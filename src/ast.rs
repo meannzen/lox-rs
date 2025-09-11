@@ -3,7 +3,13 @@ use crate::TokenKind;
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(Expression),
-    Print { expr: Expression },
+    Print {
+        expr: Expression,
+    },
+    Var {
+        name: String,
+        initializer: Option<Expression>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +40,7 @@ impl std::fmt::Display for Statement {
         match self {
             Statement::Expr(expr) => write!(f, "{expr}"),
             Statement::Print { expr } => write!(f, "{expr}"),
+            Statement::Var { name, initializer } => writeln!(f, "{name}: {:?}", initializer),
         }
     }
 }

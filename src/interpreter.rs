@@ -28,6 +28,10 @@ impl Interpreter {
                 Statement::Expr(expr) => {
                     interpreter.visit_expr(&expr)?;
                 }
+
+                p => {
+                    println!("{p}");
+                }
             }
         }
         Ok(())
@@ -38,23 +42,8 @@ impl Interpreter {
         let value = interpreter.visit_expr(&expr)?;
         Ok(value)
     }
-}
 
-impl Visitor<Value, InterpreterError> for Interpreter {
-    fn visit_expr(&mut self, expr: &crate::Expression) -> Result<Value, InterpreterError> {
-        let value = match expr {
-            Expression::Literal(literal) => self.visit_literal_expr(literal)?,
-            Expression::Unary {
-                operator,
-                expression,
-            } => self.visit_unary_expr(expression, operator)?,
-            Expression::Group(expr) => self.visit_expr(expr)?,
-            _ => self.visit_binary_expr(expr)?,
-        };
-
-        Ok(value)
-    }
-    fn visit_literal_expr(&mut self, literal: &crate::Literal) -> Result<Value, InterpreterError> {
+    fn walk_literal_expr(&mut self, literal: &crate::Literal) -> Result<Value, InterpreterError> {
         let value = match literal {
             Literal::Number(v) => Value::Number(*v),
             Literal::Boolean(v) => Value::Boolean(*v),
@@ -65,7 +54,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         Ok(value)
     }
 
-    fn visit_unary_expr(
+    fn walk_unary_expr(
         &mut self,
         expr: &Expression,
         op: &TokenKind,
@@ -85,7 +74,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         }
     }
 
-    fn visit_binary_expr(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
+    fn walk_binary_expr(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
         match expr {
             Expression::Binary {
                 left,
@@ -158,6 +147,22 @@ impl Visitor<Value, InterpreterError> for Interpreter {
             }
             _ => self.visit_expr(expr),
         }
+    }
+}
+
+impl Visitor<Value, InterpreterError> for Interpreter {
+    fn visit_expr(&mut self, expr: &crate::Expression) -> Result<Value, InterpreterError> {
+        let value = match expr {
+            Expression::Literal(literal) => self.walk_literal_expr(literal)?,
+            Expression::Unary {
+                operator,
+                expression,
+            } => self.walk_unary_expr(expression, operator)?,
+            Expression::Group(expr) => self.visit_expr(expr)?,
+            _ => self.walk_binary_expr(expr)?,
+        };
+
+        Ok(value)
     }
 }
 

@@ -28,6 +28,9 @@ impl<'input> Parser<'input> {
                     Statement::Expr(expr) => Ok(Statement::Print { expr }),
                     _ => unreachable!(),
                 },
+                TokenKind::Var => {
+                    todo!()
+                }
                 _ => {
                     let expr = self.expression()?;
                     self.consume(TokenKind::Semi)?;
