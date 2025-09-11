@@ -24,10 +24,7 @@ impl Interpreter {
                     let eval = Interpreter::evaluate(expr)?;
                     println!("{eval}");
                 }
-                Statement::Expr(expr) => {
-                    let eval = Interpreter::evaluate(expr)?;
-                    println!("{eval}");
-                }
+                _ => {}
             }
         }
         Ok(())

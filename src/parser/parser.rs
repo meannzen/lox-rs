@@ -24,8 +24,15 @@ impl<'input> Parser<'input> {
     fn statement(&mut self) -> Result<Statement, ParserError> {
         if let Some(token) = self.peek() {
             match token.kind {
-                TokenKind::Print => self.statement_expr(),
-                _ => unimplemented!("I'm not implement yet, please don't panic"),
+                TokenKind::Print => match self.statement_expr()? {
+                    Statement::Expr(expr) => Ok(Statement::Print { expr }),
+                    _ => unreachable!(),
+                },
+                _ => {
+                    let expr = self.expression()?;
+                    self.consume(TokenKind::Semi)?;
+                    Ok(Statement::Expr(expr))
+                }
             }
         } else {
             Err(ParserError::UnexpectedEof { line: 1 })
