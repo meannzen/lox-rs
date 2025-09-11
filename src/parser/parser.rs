@@ -1,6 +1,6 @@
 use std::iter::Peekable;
 
-use crate::{ast::Expression, Lexer, ParserError, Token, TokenKind};
+use crate::{ast::Expression, Lexer, ParserError, Statement, Token, TokenKind};
 
 pub struct Parser<'input> {
     tokens: Peekable<Lexer<'input>>,
@@ -11,6 +11,32 @@ impl<'input> Parser<'input> {
         Parser {
             tokens: Lexer::new(input).peekable(),
         }
+    }
+
+    pub fn parse_statements(&mut self) -> Result<Vec<Statement>, ParserError> {
+        let mut statements = Vec::new();
+        while self.peek().is_some() {
+            statements.push(self.statement()?);
+        }
+        Ok(statements)
+    }
+
+    fn statement(&mut self) -> Result<Statement, ParserError> {
+        if let Some(token) = self.peek() {
+            match token.kind {
+                TokenKind::Print => self.statement_expr(),
+                _ => unimplemented!("I'm not implement yet, please don't panic"),
+            }
+        } else {
+            Err(ParserError::UnexpectedEof { line: 1 })
+        }
+    }
+
+    fn statement_expr(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap();
+        let expr = self.expression()?;
+        self.consume(TokenKind::Semi)?;
+        Ok(Statement::Expr(expr))
     }
 
     pub fn parse(&mut self) -> Result<Expression, ParserError> {

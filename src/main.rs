@@ -13,6 +13,7 @@ enum Command {
     Tokenize { filename: PathBuf },
     Parse { filename: PathBuf },
     Evaluate { filename: PathBuf },
+    Run { filename: PathBuf },
 }
 
 fn main() -> codecrafters_interpreter::Result<()> {
@@ -69,7 +70,28 @@ fn main() -> codecrafters_interpreter::Result<()> {
             let mut parser = codecrafters_interpreter::Parser::new(&file_content);
 
             match parser.parse() {
-                Ok(expr) => match Interpreter::run(expr) {
+                Ok(expr) => match Interpreter::evaluate(expr) {
+                    Ok(value) => {
+                        println!("{value}");
+                    }
+                    Err(err) => {
+                        eprintln!("{err}");
+                        process::exit(70);
+                    }
+                },
+                Err(err) => {
+                    eprintln!("{err}");
+                    process::exit(65);
+                }
+            }
+        }
+
+        Command::Run { filename } => {
+            let file_content = std::fs::read_to_string(filename)?;
+            let mut parser = codecrafters_interpreter::Parser::new(&file_content);
+
+            match parser.parse_statements() {
+                Ok(stmt) => match Interpreter::run(stmt) {
                     Ok(_) => {}
                     Err(err) => {
                         eprintln!("{err}");

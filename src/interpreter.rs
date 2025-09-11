@@ -1,4 +1,4 @@
-use crate::{Expression, Literal, TokenKind, Visitor};
+use crate::{Expression, Literal, Statement, TokenKind, Visitor};
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -17,15 +17,26 @@ pub enum InterpreterError {
 pub struct Interpreter;
 
 impl Interpreter {
-    pub fn run(expr: Expression) -> Result<(), InterpreterError> {
-        let mut interpreter = Interpreter;
-        let value = interpreter.visit_expr(&expr)?;
-        interpreter.evaluate(value);
+    pub fn run(stmt: Vec<Statement>) -> Result<(), InterpreterError> {
+        for st in stmt.into_iter() {
+            match st {
+                Statement::Print { expr } => {
+                    let eval = Interpreter::evaluate(expr)?;
+                    println!("{eval}");
+                }
+                Statement::Expr(expr) => {
+                    let eval = Interpreter::evaluate(expr)?;
+                    println!("{eval}");
+                }
+            }
+        }
         Ok(())
     }
 
-    fn evaluate(&self, value: Value) {
-        println!("{value}");
+    pub fn evaluate(expr: Expression) -> Result<Value, InterpreterError> {
+        let mut interpreter = Interpreter;
+        let value = interpreter.visit_expr(&expr)?;
+        Ok(value)
     }
 }
 
@@ -146,11 +157,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
 
 impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            _ => {
-                write!(f, "Operand must be a number.")
-            }
-        }
+        write!(f, "Operand must be a number.")
     }
 }
 

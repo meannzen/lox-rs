@@ -1,2 +1,3 @@
-"hhel"/2
+print "world" + "baz" + "bar";
 
+print "world" + "baz" + "bar";

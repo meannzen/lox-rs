@@ -1,6 +1,12 @@
 use crate::TokenKind;
 
 #[derive(Debug, Clone)]
+pub enum Statement {
+    Expr(Expression),
+    Print { expr: Expression },
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     Binary {
         left: Box<Expression>,
@@ -21,6 +27,15 @@ pub enum Literal {
     String(String),
     Boolean(bool),
     Nil,
+}
+
+impl std::fmt::Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Statement::Expr(expr) => write!(f, "{expr}"),
+            Statement::Print { expr } => write!(f, "{expr}"),
+        }
+    }
 }
 
 impl std::fmt::Display for Literal {
