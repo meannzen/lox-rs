@@ -1,3 +1,8 @@
-print "world" + "baz" + "bar";
+print true != true;
 
-print "world" + "baz" + "bar";
+print "36
+10
+78
+";
+
+print "There should be an empty line above this.";

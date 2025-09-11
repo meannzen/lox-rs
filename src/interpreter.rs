@@ -147,6 +147,12 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                     (Value::String(_), TokenKind::BangEqual, Value::Number(_)) => {
                         Ok(Value::Boolean(true))
                     }
+                    (Value::Boolean(b), TokenKind::BangEqual, Value::Boolean(b1)) => {
+                        Ok(Value::Boolean(b != b1))
+                    }
+                    (Value::Boolean(b), TokenKind::EqualEqual, Value::Boolean(b1)) => {
+                        Ok(Value::Boolean(b == b1))
+                    }
                     _ => Err(InterpreterError::Binary),
                 }
             }
