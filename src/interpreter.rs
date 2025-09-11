@@ -18,13 +18,16 @@ pub struct Interpreter;
 
 impl Interpreter {
     pub fn run(stmt: Vec<Statement>) -> Result<(), InterpreterError> {
+        let mut interpreter = Interpreter;
         for st in stmt.into_iter() {
             match st {
                 Statement::Print { expr } => {
                     let eval = Interpreter::evaluate(expr)?;
                     println!("{eval}");
                 }
-                _ => {}
+                Statement::Expr(expr) => {
+                    interpreter.visit_expr(&expr)?;
+                }
             }
         }
         Ok(())
