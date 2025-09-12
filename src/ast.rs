@@ -3,9 +3,8 @@ use crate::TokenKind;
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(Expression),
-    Print {
-        expr: Expression,
-    },
+    Print(Expression),
+
     Var {
         name: String,
         initializer: Option<Expression>,
@@ -14,6 +13,10 @@ pub enum Statement {
 
 #[derive(Debug, Clone)]
 pub enum Expression {
+    Assign {
+        name: String,
+        value: Box<Expression>,
+    },
     Binary {
         left: Box<Expression>,
         operator: TokenKind,
@@ -25,6 +28,7 @@ pub enum Expression {
         expression: Box<Expression>,
     },
     Group(Box<Expression>),
+    Variable(String),
 }
 
 #[derive(Debug, Clone)]
@@ -39,7 +43,7 @@ impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Statement::Expr(expr) => write!(f, "{expr}"),
-            Statement::Print { expr } => write!(f, "{expr}"),
+            Statement::Print(expr) => write!(f, "{expr}"),
             Statement::Var { name, initializer } => writeln!(f, "{name}: {:?}", initializer),
         }
     }
@@ -98,6 +102,8 @@ impl std::fmt::Display for Expression {
                 };
                 write!(f, "({} {})", op, expression)
             }
+            Expression::Variable(kind) => write!(f, "{kind:?}"),
+            Expression::Assign { name, value } => write!(f, "{name}={value}"),
         }
     }
 }

@@ -24,26 +24,42 @@ impl<'input> Parser<'input> {
     fn statement(&mut self) -> Result<Statement, ParserError> {
         if let Some(token) = self.peek() {
             match token.kind {
-                TokenKind::Print => match self.statement_expr()? {
-                    Statement::Expr(expr) => Ok(Statement::Print { expr }),
-                    _ => unreachable!(),
-                },
-                TokenKind::Var => {
-                    todo!()
-                }
-                _ => {
-                    let expr = self.expression()?;
-                    self.consume(TokenKind::Semi)?;
-                    Ok(Statement::Expr(expr))
-                }
+                TokenKind::Print => self.print_statment(),
+                TokenKind::Var => self.declaration(),
+                _ => self.expr_statement(),
             }
         } else {
             Err(ParserError::UnexpectedEof { line: 1 })
         }
     }
 
-    fn statement_expr(&mut self) -> Result<Statement, ParserError> {
+    fn declaration(&mut self) -> Result<Statement, ParserError> {
         self.advance().unwrap();
+        let variable = self.consume(TokenKind::Identifier)?;
+        let mut initializer: Option<Expression> = None;
+        if let Some(token) = self.peek() {
+            if token.kind == TokenKind::Equal {
+                self.advance().unwrap();
+                initializer = Some(self.expression()?);
+            }
+        }
+
+        self.consume(TokenKind::Semi)?;
+
+        Ok(Statement::Var {
+            name: variable.literal,
+            initializer,
+        })
+    }
+
+    fn print_statment(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap();
+        let expr = self.expression()?;
+        self.consume(TokenKind::Semi)?;
+        Ok(Statement::Print(expr))
+    }
+
+    fn expr_statement(&mut self) -> Result<Statement, ParserError> {
         let expr = self.expression()?;
         self.consume(TokenKind::Semi)?;
         Ok(Statement::Expr(expr))
@@ -54,7 +70,26 @@ impl<'input> Parser<'input> {
     }
 
     fn expression(&mut self) -> Result<Expression, ParserError> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> Result<Expression, ParserError> {
+        let expr = self.equality()?;
+        if let Some(token) = self.peek() {
+            if token.kind == TokenKind::Equal {
+                self.advance().unwrap();
+                let value = self.assignment()?;
+                if let Expression::Variable(name) = expr {
+                    return Ok(Expression::Assign {
+                        name,
+                        value: Box::new(value),
+                    });
+                }
+
+                return Err(ParserError::UnexpectedEof { line: 1 });
+            }
+        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expression, ParserError> {
@@ -163,6 +198,7 @@ impl<'input> Parser<'input> {
             TokenKind::True => Ok(Expression::Literal(crate::ast::Literal::Boolean(true))),
             TokenKind::False => Ok(Expression::Literal(crate::ast::Literal::Boolean(false))),
             TokenKind::Nil => Ok(Expression::Literal(crate::ast::Literal::Nil)),
+            TokenKind::Identifier => Ok(Expression::Variable(token.literal)),
             TokenKind::LeftParen => {
                 let expression = self.expression()?;
                 self.consume(TokenKind::RightParen)?;

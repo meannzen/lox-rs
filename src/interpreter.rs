@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{Expression, Literal, Statement, TokenKind, Visitor};
 
 #[derive(Debug, Clone)]
@@ -12,38 +14,86 @@ pub enum Value {
 pub enum InterpreterError {
     Unary,
     Binary,
+    UndefinedVariable,
 }
 
-pub struct Interpreter;
+pub struct Interpreter {
+    environment: HashMap<String, Value>,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Interpreter {
+    pub fn new() -> Interpreter {
+        Interpreter {
+            environment: HashMap::new(),
+        }
+    }
+}
+
+impl Visitor<Value, InterpreterError> for Interpreter {
+    fn visit_expr(&mut self, expr: &crate::Expression) -> Result<Value, InterpreterError> {
+        let value = match expr {
+            Expression::Literal(literal) => self.visit_literal_expr(literal)?,
+            Expression::Unary {
+                operator,
+                expression,
+            } => self.visit_unary_expr(expression, operator)?,
+            Expression::Group(expr) => self.visit_expr(expr)?,
+            Expression::Assign { name, value } => self.visit_assignment(name, value)?,
+            Expression::Variable(name) => self.get_value(name)?,
+            _ => self.visit_binary_expr(expr)?,
+        };
+
+        Ok(value)
+    }
+
+    fn visit_stmt(&mut self, stms: &Statement) -> Result<(), InterpreterError> {
+        match stms {
+            Statement::Print(expr) => {
+                let eval = self.visit_expr(expr)?;
+                println!("{eval}");
+            }
+            Statement::Expr(expr) => {
+                let _result = self.visit_expr(expr)?;
+            }
+
+            Statement::Var { name, initializer } => {
+                let value = if let Some(expr) = initializer {
+                    self.visit_expr(expr)?
+                } else {
+                    Value::Nil
+                };
+
+                self.environment.insert(name.clone(), value);
+            }
+        }
+
+        Ok(())
+    }
+}
 
 impl Interpreter {
     pub fn run(stmt: Vec<Statement>) -> Result<(), InterpreterError> {
-        let mut interpreter = Interpreter;
-        for st in stmt.into_iter() {
-            match st {
-                Statement::Print { expr } => {
-                    let eval = Interpreter::evaluate(expr)?;
-                    println!("{eval}");
-                }
-                Statement::Expr(expr) => {
-                    interpreter.visit_expr(&expr)?;
-                }
-
-                p => {
-                    println!("{p}");
-                }
-            }
+        let mut interpreter = Interpreter::new();
+        for st in stmt.iter() {
+            interpreter.visit_stmt(st)?;
         }
+
         Ok(())
     }
 
     pub fn evaluate(expr: Expression) -> Result<Value, InterpreterError> {
-        let mut interpreter = Interpreter;
+        let mut interpreter = Interpreter::new();
         let value = interpreter.visit_expr(&expr)?;
         Ok(value)
     }
 
-    fn walk_literal_expr(&mut self, literal: &crate::Literal) -> Result<Value, InterpreterError> {
+    fn visit_literal_expr(&mut self, literal: &crate::Literal) -> Result<Value, InterpreterError> {
         let value = match literal {
             Literal::Number(v) => Value::Number(*v),
             Literal::Boolean(v) => Value::Boolean(*v),
@@ -54,7 +104,28 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn walk_unary_expr(
+    fn get_value(&mut self, name: &str) -> Result<Value, InterpreterError> {
+        self.environment
+            .get(name)
+            .cloned()
+            .ok_or(InterpreterError::UndefinedVariable)
+    }
+
+    fn visit_assignment(
+        &mut self,
+        name: &str,
+        expr: &Expression,
+    ) -> Result<Value, InterpreterError> {
+        let new_value = self.visit_expr(expr)?;
+        if self.environment.contains_key(name) {
+            self.environment.insert(name.to_string(), new_value.clone());
+            Ok(new_value)
+        } else {
+            Err(InterpreterError::UndefinedVariable)
+        }
+    }
+
+    fn visit_unary_expr(
         &mut self,
         expr: &Expression,
         op: &TokenKind,
@@ -74,7 +145,7 @@ impl Interpreter {
         }
     }
 
-    fn walk_binary_expr(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
+    fn visit_binary_expr(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
         match expr {
             Expression::Binary {
                 left,
@@ -150,25 +221,12 @@ impl Interpreter {
     }
 }
 
-impl Visitor<Value, InterpreterError> for Interpreter {
-    fn visit_expr(&mut self, expr: &crate::Expression) -> Result<Value, InterpreterError> {
-        let value = match expr {
-            Expression::Literal(literal) => self.walk_literal_expr(literal)?,
-            Expression::Unary {
-                operator,
-                expression,
-            } => self.walk_unary_expr(expression, operator)?,
-            Expression::Group(expr) => self.visit_expr(expr)?,
-            _ => self.walk_binary_expr(expr)?,
-        };
-
-        Ok(value)
-    }
-}
-
 impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Operand must be a number.")
+        match self {
+            InterpreterError::UndefinedVariable => write!(f, "null"),
+            _ => write!(f, "Operand must be a number."),
+        }
     }
 }
 
