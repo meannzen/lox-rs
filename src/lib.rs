@@ -3,15 +3,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 mod ast;
 mod interpreter;
-mod lexer;
 mod parser;
-mod token;
+mod tokenizer;
 mod visit;
 
 pub use ast::*;
 pub use interpreter::*;
-pub use lexer::Lexer;
-pub use parser::Parser;
-pub use parser::ParserError;
-pub use token::*;
+pub use parser::*;
+pub use tokenizer::*;
 pub use visit::*;
