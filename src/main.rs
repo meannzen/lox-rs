@@ -94,6 +94,7 @@ fn main() -> codecrafters_interpreter::Result<()> {
                 Ok(stmt) => match Interpreter::run(stmt) {
                     Ok(_) => {}
                     Err(err) => {
+                        // lazy to do it
                         eprintln!("{err}");
                         process::exit(70);
                     }
