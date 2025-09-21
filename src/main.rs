@@ -69,8 +69,9 @@ fn main() -> codecrafters_interpreter::Result<()> {
             let file_content = std::fs::read_to_string(filename)?;
             let mut parser = codecrafters_interpreter::Parser::new(&file_content);
 
+            let mut interpreter = Interpreter::new();
             match parser.parse() {
-                Ok(expr) => match Interpreter::evaluate(expr) {
+                Ok(expr) => match interpreter.evaluate(&expr) {
                     Ok(value) => {
                         println!("{value}");
                     }

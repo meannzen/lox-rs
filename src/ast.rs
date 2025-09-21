@@ -5,10 +5,15 @@ pub enum Statement {
     Expr(Expression),
     Block(Vec<Statement>),
     Print(Expression),
-
     Var {
         name: String,
         initializer: Option<Expression>,
+    },
+
+    If {
+        condition: Box<Expression>,
+        then_branch: Box<Statement>,
+        else_branch: Option<Box<Statement>>,
     },
 }
 
@@ -47,6 +52,11 @@ impl std::fmt::Display for Statement {
             Statement::Print(expr) => write!(f, "{expr}"),
             Statement::Var { name, initializer } => write!(f, "{name}: {:?}", initializer),
             Statement::Block(list) => write!(f, "{list:?}"),
+            Statement::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => write!(f, "{}, {}, {:?}", condition, then_branch, else_branch),
         }
     }
 }

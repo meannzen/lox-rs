@@ -128,6 +128,15 @@ impl Visitor<Value, InterpreterError> for Interpreter {
 
                 self.environment = old_env;
             }
+
+            Statement::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                let expression = condition.clone();
+                self.visit_if_stms(&expression, then_branch, else_branch)?;
+            }
         }
 
         Ok(())
@@ -136,6 +145,21 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         for s in list.iter() {
             self.visit_stmt(s)?;
         }
+        Ok(())
+    }
+
+    fn visit_if_stms(
+        &mut self,
+        condition: &Expression,
+        then_branch: &Statement,
+        else_branch: &Option<Box<Statement>>,
+    ) -> Result<(), InterpreterError> {
+        if is_truthy(&self.evaluate(condition)?) {
+            self.visit_stmt(then_branch)?;
+        } else if let Some(stms) = else_branch {
+            self.visit_stmt(stms)?;
+        }
+
         Ok(())
     }
 }
@@ -150,10 +174,38 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn evaluate(expr: Expression) -> Result<Value, InterpreterError> {
-        let mut interpreter = Interpreter::new();
-        let value = interpreter.visit_expr(&expr)?;
-        Ok(value)
+    pub fn evaluate(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
+        match expr {
+            Expression::Literal(literal) => self.visit_literal_expr(literal),
+
+            Expression::Unary {
+                operator,
+                expression,
+            } => self.visit_unary_expr(expression, operator),
+
+            Expression::Group(inner_expr) => self.evaluate(inner_expr),
+
+            Expression::Variable(name) => self
+                .environment
+                .borrow()
+                .get(name)
+                .ok_or(InterpreterError::UndefinedVariable(name.clone())),
+
+            Expression::Assign { name, value } => {
+                let new_value = self.evaluate(value)?;
+                if self
+                    .environment
+                    .borrow_mut()
+                    .assign(name, new_value.clone())
+                {
+                    Ok(new_value)
+                } else {
+                    Err(InterpreterError::UndefinedVariable(name.clone()))
+                }
+            }
+
+            binary => self.visit_binary_expr(binary),
+        }
     }
 
     fn visit_literal_expr(&mut self, literal: &crate::Literal) -> Result<Value, InterpreterError> {
@@ -303,5 +355,13 @@ impl std::fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::String(v) => write!(f, "{v}"),
         }
+    }
+}
+
+fn is_truthy(value: &Value) -> bool {
+    match value {
+        Value::Boolean(v) => *v,
+        Value::Nil => false,
+        _ => true,
     }
 }

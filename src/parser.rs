@@ -47,6 +47,7 @@ impl<'input> Parser<'input> {
                 TokenKind::Print => self.print_statment(),
                 TokenKind::Var => self.declaration(),
                 TokenKind::LeftBrace => self.block(),
+                TokenKind::If => self.if_statement(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -100,6 +101,25 @@ impl<'input> Parser<'input> {
         self.consume(TokenKind::RightBrace)?;
 
         Ok(Statement::Block(blocks))
+    }
+
+    fn if_statement(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap();
+        self.consume(TokenKind::LeftParen)?;
+        let condition = self.expression()?;
+        self.consume(TokenKind::RightParen)?;
+        let then_branch = self.statement()?;
+        let mut else_branch = None;
+        if let Some(token) = self.peek() {
+            if token.kind == TokenKind::Else {
+                else_branch = Some(Box::new(self.statement()?));
+            }
+        }
+        Ok(Statement::If {
+            condition: Box::new(condition),
+            then_branch: Box::new(then_branch),
+            else_branch,
+        })
     }
 
     pub fn parse(&mut self) -> Result<Expression, ParserError> {
