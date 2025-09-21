@@ -46,6 +46,7 @@ impl<'input> Parser<'input> {
             match token.kind {
                 TokenKind::Print => self.print_statment(),
                 TokenKind::Var => self.declaration(),
+                TokenKind::LeftBrace => self.block(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -83,6 +84,22 @@ impl<'input> Parser<'input> {
         let expr = self.expression()?;
         self.consume(TokenKind::Semi)?;
         Ok(Statement::Expr(expr))
+    }
+
+    fn block(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap();
+        let mut blocks = Vec::new();
+        while let Some(token) = self.peek() {
+            if token.kind == TokenKind::RightBrace {
+                break;
+            }
+            let declaration = self.statement()?;
+            blocks.push(declaration);
+        }
+
+        self.consume(TokenKind::RightBrace)?;
+
+        Ok(Statement::Block(blocks))
     }
 
     pub fn parse(&mut self) -> Result<Expression, ParserError> {

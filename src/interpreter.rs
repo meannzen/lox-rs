@@ -17,8 +17,24 @@ pub enum InterpreterError {
     UndefinedVariable,
 }
 
+#[derive(Debug)]
+#[allow(dead_code)]
+struct Environment {
+    enclosing: Option<Box<Environment>>,
+    values: HashMap<String, Value>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Environment {
+            enclosing: None,
+            values: HashMap::new(),
+        }
+    }
+}
+
 pub struct Interpreter {
-    environment: HashMap<String, Value>,
+    environment: Environment,
 }
 
 impl Default for Interpreter {
@@ -30,7 +46,7 @@ impl Default for Interpreter {
 impl Interpreter {
     pub fn new() -> Interpreter {
         Interpreter {
-            environment: HashMap::new(),
+            environment: Environment::new(),
         }
     }
 }
@@ -69,10 +85,20 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                     Value::Nil
                 };
 
-                self.environment.insert(name.clone(), value);
+                self.environment.values.insert(name.clone(), value);
+            }
+
+            Statement::Block(list) => {
+                self.visit_block(list)?;
             }
         }
 
+        Ok(())
+    }
+    fn visit_block(&mut self, list: &Vec<Statement>) -> Result<(), InterpreterError> {
+        for s in list.iter() {
+            self.visit_stmt(s)?;
+        }
         Ok(())
     }
 }
@@ -106,6 +132,7 @@ impl Interpreter {
 
     fn get_value(&mut self, name: &str) -> Result<Value, InterpreterError> {
         self.environment
+            .values
             .get(name)
             .cloned()
             .ok_or(InterpreterError::UndefinedVariable)
@@ -117,8 +144,10 @@ impl Interpreter {
         expr: &Expression,
     ) -> Result<Value, InterpreterError> {
         let new_value = self.visit_expr(expr)?;
-        if self.environment.contains_key(name) {
-            self.environment.insert(name.to_string(), new_value.clone());
+        if self.environment.values.contains_key(name) {
+            self.environment
+                .values
+                .insert(name.to_string(), new_value.clone());
             Ok(new_value)
         } else {
             Err(InterpreterError::UndefinedVariable)
