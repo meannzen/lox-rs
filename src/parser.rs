@@ -1,7 +1,6 @@
 use std::iter::Peekable;
 
 use crate::{ast::Expression, Lexer, Statement, Token, TokenKind};
-
 #[derive(Debug)]
 pub enum ParserError {
     UnexpectedEof { line: usize },
@@ -48,6 +47,7 @@ impl<'input> Parser<'input> {
                 TokenKind::Var => self.declaration(),
                 TokenKind::LeftBrace => self.block(),
                 TokenKind::If => self.if_statement(),
+                TokenKind::Else => self.else_statement(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -120,6 +120,11 @@ impl<'input> Parser<'input> {
             then_branch: Box::new(then_branch),
             else_branch,
         })
+    }
+
+    fn else_statement(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap();
+        self.statement()
     }
 
     pub fn parse(&mut self) -> Result<Expression, ParserError> {
