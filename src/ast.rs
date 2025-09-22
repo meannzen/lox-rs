@@ -15,6 +15,17 @@ pub enum Statement {
         then_branch: Box<Statement>,
         else_branch: Option<Box<Statement>>,
     },
+    While {
+        condition: Box<Expression>,
+        body: Box<Statement>,
+    },
+
+    For {
+        initialize: Option<Box<Statement>>,
+        condition: Option<Box<Expression>>,
+        increment: Option<Box<Expression>>,
+        body: Box<Statement>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -61,7 +72,21 @@ impl std::fmt::Display for Statement {
                 condition,
                 then_branch,
                 else_branch,
-            } => write!(f, "{}, {}, {:?}", condition, then_branch, else_branch),
+            } => write!(
+                f,
+                "condition:{}, then: {}, else {:?}",
+                condition, then_branch, else_branch
+            ),
+            Statement::While { condition, body } => {
+                write!(f, "condition {}, body {}", condition, body)
+            }
+
+            Statement::For {
+                initialize,
+                condition,
+                increment,
+                body,
+            } => write!(f, "init :{initialize:?} condition:{condition:?} increment: {increment:?} body {body:?}"),
         }
     }
 }

@@ -124,6 +124,18 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         self.evaluate(right)
     }
 
+    fn visit_while(
+        &mut self,
+        condition: &Expression,
+        body: &Statement,
+    ) -> Result<(), InterpreterError> {
+        while is_truthy(&self.evaluate(condition)?) {
+            self.visit_stmt(body)?;
+        }
+
+        Ok(())
+    }
+
     fn visit_stmt(&mut self, stms: &Statement) -> Result<(), InterpreterError> {
         match stms {
             Statement::Print(expr) => {
@@ -161,6 +173,19 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 let expression = condition.clone();
                 self.visit_if_stms(&expression, then_branch, else_branch)?;
             }
+
+            Statement::While { condition, body } => self.visit_while(condition, body)?,
+            Statement::For {
+                initialize,
+                condition,
+                increment,
+                body,
+            } => {
+                let initialize = initialize.as_ref().map(|stms| stms.as_ref().clone());
+                let condition = condition.as_ref().map(|expr| expr.as_ref().clone());
+                let increment = increment.as_ref().map(|expr| expr.as_ref().clone());
+                self.visit_for(&initialize, &condition, &increment, body)?;
+            }
         }
 
         Ok(())
@@ -182,6 +207,34 @@ impl Visitor<Value, InterpreterError> for Interpreter {
             self.visit_stmt(then_branch)?;
         } else if let Some(stms) = else_branch {
             self.visit_stmt(stms)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_for(
+        &mut self,
+        initialize: &Option<Statement>,
+        condition: &Option<Expression>,
+        increment: &Option<Expression>,
+        body: &Statement,
+    ) -> Result<(), InterpreterError> {
+        if let Some(init) = initialize {
+            self.visit_stmt(init)?;
+        }
+
+        loop {
+            if let Some(con) = condition {
+                if !is_truthy(&self.evaluate(con)?) {
+                    break;
+                }
+            }
+
+            self.visit_stmt(body)?;
+
+            if let Some(inc) = increment {
+                self.evaluate(inc)?;
+            }
         }
 
         Ok(())

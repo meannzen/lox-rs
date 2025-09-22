@@ -16,4 +16,13 @@ pub trait Visitor<T, E: std::error::Error> {
         operator: &TokenKind,
         right: &Expression,
     ) -> Result<T, E>;
+
+    fn visit_while(&mut self, condition: &Expression, body: &Statement) -> Result<(), E>;
+    fn visit_for(
+        &mut self,
+        initialize: &Option<Statement>,
+        condition: &Option<Expression>,
+        increment: &Option<Expression>,
+        body: &Statement,
+    ) -> Result<(), E>;
 }

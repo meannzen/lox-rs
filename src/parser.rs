@@ -48,6 +48,8 @@ impl<'input> Parser<'input> {
                 TokenKind::LeftBrace => self.block(),
                 TokenKind::If => self.if_statement(),
                 TokenKind::Else => self.else_statement(),
+                TokenKind::While => self.while_statement(),
+                TokenKind::For => self.for_statement(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -126,7 +128,62 @@ impl<'input> Parser<'input> {
         self.advance().unwrap();
         self.statement()
     }
+    fn while_statement(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap();
+        self.consume(TokenKind::LeftParen)?;
+        let condition = self.expression()?;
+        self.consume(TokenKind::RightParen)?;
+        let body = self.statement()?;
 
+        Ok(Statement::While {
+            condition: condition.into(),
+            body: body.into(),
+        })
+    }
+
+    fn for_statement(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap();
+        self.consume(TokenKind::LeftParen)?;
+        let mut initialize = None;
+        if let Some(token) = self.peek() {
+            match token.kind {
+                TokenKind::Var => {
+                    initialize = Some(Box::new(self.declaration()?));
+                }
+                _ => {
+                    initialize = Some(Box::new(self.expr_statement()?));
+                }
+            }
+        }
+
+        let mut condition = None;
+
+        if let Some(token) = self.peek() {
+            if token.kind != TokenKind::Semi {
+                condition = Some(Box::new(self.expression()?));
+            }
+        }
+
+        self.consume(TokenKind::Semi)?;
+
+        let mut increment = None;
+
+        if let Some(token) = self.peek() {
+            if token.kind != TokenKind::RightParen {
+                increment = Some(Box::new(self.expression()?));
+            }
+        }
+
+        self.consume(TokenKind::RightParen)?;
+        let body = Box::new(self.statement()?);
+
+        Ok(Statement::For {
+            initialize,
+            condition,
+            increment,
+            body,
+        })
+    }
     pub fn parse(&mut self) -> Result<Expression, ParserError> {
         self.expression()
     }
@@ -136,7 +193,7 @@ impl<'input> Parser<'input> {
     }
 
     fn assignment(&mut self) -> Result<Expression, ParserError> {
-        let expr = self.or()?;
+        let expr = self.or_expression()?;
         if let Some(token) = self.peek() {
             if token.kind == TokenKind::Equal {
                 self.advance().unwrap();
@@ -154,13 +211,13 @@ impl<'input> Parser<'input> {
         Ok(expr)
     }
 
-    fn or(&mut self) -> Result<Expression, ParserError> {
-        let mut expr = self.and()?;
+    fn or_expression(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.and_expression()?;
         while let Some(token) = self.peek() {
             match token.kind {
                 TokenKind::Or => {
                     let operator = self.advance().unwrap();
-                    let right = self.and()?;
+                    let right = self.and_expression()?;
                     expr = Expression::Logical {
                         left: Box::new(expr),
                         operator: operator.kind,
@@ -174,7 +231,7 @@ impl<'input> Parser<'input> {
         Ok(expr)
     }
 
-    fn and(&mut self) -> Result<Expression, ParserError> {
+    fn and_expression(&mut self) -> Result<Expression, ParserError> {
         let mut expr = self.equality()?;
         while let Some(token) = self.peek() {
             match token.kind {
