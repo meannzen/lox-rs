@@ -35,6 +35,11 @@ pub enum Expression {
     },
     Group(Box<Expression>),
     Variable(String),
+    Logical {
+        left: Box<Expression>,
+        operator: TokenKind,
+        right: Box<Expression>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +121,11 @@ impl std::fmt::Display for Expression {
             }
             Expression::Variable(kind) => write!(f, "{kind:?}"),
             Expression::Assign { name, value } => write!(f, "{name}={value}"),
+            Expression::Logical {
+                left: lelf,
+                operator,
+                right,
+            } => write!(f, "{} {:?} {}", lelf, operator, right),
         }
     }
 }

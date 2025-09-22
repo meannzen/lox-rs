@@ -136,7 +136,7 @@ impl<'input> Parser<'input> {
     }
 
     fn assignment(&mut self) -> Result<Expression, ParserError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
         if let Some(token) = self.peek() {
             if token.kind == TokenKind::Equal {
                 self.advance().unwrap();
@@ -151,6 +151,46 @@ impl<'input> Parser<'input> {
                 return Err(ParserError::UnexpectedEof { line: 1 });
             }
         }
+        Ok(expr)
+    }
+
+    fn or(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.and()?;
+        while let Some(token) = self.peek() {
+            match token.kind {
+                TokenKind::Or => {
+                    let operator = self.advance().unwrap();
+                    let right = self.and()?;
+                    expr = Expression::Logical {
+                        left: Box::new(expr),
+                        operator: operator.kind,
+                        right: Box::new(right),
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.equality()?;
+        while let Some(token) = self.peek() {
+            match token.kind {
+                TokenKind::And => {
+                    let operator = self.advance().unwrap();
+                    let right = self.equality()?;
+                    expr = Expression::Logical {
+                        left: Box::new(expr),
+                        operator: operator.kind,
+                        right: Box::new(right),
+                    }
+                }
+                _ => break,
+            }
+        }
+
         Ok(expr)
     }
 

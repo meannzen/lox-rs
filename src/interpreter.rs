@@ -94,10 +94,34 @@ impl Visitor<Value, InterpreterError> for Interpreter {
             Expression::Group(expr) => self.visit_expr(expr)?,
             Expression::Assign { name, value } => self.visit_assignment(name, value)?,
             Expression::Variable(name) => self.get_value(name)?,
+            Expression::Logical {
+                left,
+                operator,
+                right,
+            } => self.visit_logical(left, operator, right)?,
             _ => self.visit_binary_expr(expr)?,
         };
 
         Ok(value)
+    }
+
+    fn visit_logical(
+        &mut self,
+        left: &Expression,
+        operator: &TokenKind,
+        right: &Expression,
+    ) -> Result<Value, InterpreterError> {
+        let left_value = self.evaluate(left)?;
+
+        if *operator == TokenKind::Or {
+            if is_truthy(&left_value) {
+                return Ok(left_value);
+            }
+        } else if *operator == TokenKind::And && !is_truthy(&left_value) {
+            return Ok(left_value);
+        }
+
+        self.evaluate(right)
     }
 
     fn visit_stmt(&mut self, stms: &Statement) -> Result<(), InterpreterError> {
@@ -203,6 +227,11 @@ impl Interpreter {
                     Err(InterpreterError::UndefinedVariable(name.clone()))
                 }
             }
+            Expression::Logical {
+                left,
+                operator,
+                right,
+            } => self.visit_logical(left, operator, right),
 
             binary => self.visit_binary_expr(binary),
         }
