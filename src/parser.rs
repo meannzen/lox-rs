@@ -150,6 +150,9 @@ impl<'input> Parser<'input> {
                 TokenKind::Var => {
                     initialize = Some(Box::new(self.declaration()?));
                 }
+                TokenKind::Semi => {
+                    self.consume(TokenKind::Semi)?;
+                }
                 _ => {
                     initialize = Some(Box::new(self.expr_statement()?));
                 }
