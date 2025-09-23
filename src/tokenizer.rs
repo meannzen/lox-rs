@@ -7,7 +7,7 @@ pub struct Token {
     pub column: usize,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TokenKind {
     LeftParen,
     RightParen,
@@ -50,7 +50,7 @@ pub enum TokenKind {
     Illegal(IlligalType),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum IlligalType {
     Unexpected,
     UnterminatedString,
