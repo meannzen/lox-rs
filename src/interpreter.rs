@@ -5,7 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{Callable, Expression, Literal, NaviveFunction, Statement, TokenKind, Visitor};
+use crate::{Callable, Expression, Literal, NativeFunction, Statement, TokenKind, Visitor};
 
 #[derive(Debug)]
 pub enum Value {
@@ -34,10 +34,46 @@ pub enum InterpreterError {
     UndefinedVariable(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Environment {
     enclosing: Option<Rc<RefCell<Environment>>>,
     values: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone)]
+struct LoxFunction {
+    name: String,
+    params: Vec<String>,
+    body: Vec<Statement>,
+    environment: Rc<RefCell<Environment>>,
+}
+
+impl Callable for LoxFunction {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> Result<Value, InterpreterError> {
+        let old_env = interpreter.environment.clone();
+        let new_env = Environment::new_enclosed(&self.environment.clone());
+
+        for (name, value) in self.params.iter().zip(args.iter()) {
+            new_env.borrow_mut().defind(name, value.clone());
+        }
+
+        interpreter.environment = new_env;
+        let result = interpreter.visit_block(&self.body);
+        interpreter.environment = old_env;
+        result.map(|_| Value::Nil)
+    }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn arity(&self) -> usize {
+        self.params.len()
+    }
 }
 
 impl Environment {
@@ -91,7 +127,7 @@ impl Interpreter {
         let global = Rc::new(RefCell::new(Environment::new()));
         global.borrow_mut().defind(
             "clock",
-            Value::Function(Rc::new(NaviveFunction {
+            Value::Function(Rc::new(NativeFunction {
                 name: "clock".to_string(),
                 arity: 0,
                 function: |_| {
@@ -220,7 +256,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 self.visit_for(&initialize, &condition, &increment, body)?;
             }
             Statement::Function { name, params, body } => {
-                println!("{name}, {params:?} {body:?}");
+                self.visit_function_stms(name, params, body)
             }
         }
 
@@ -301,6 +337,19 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 "Can only call functions and classes.".to_string(),
             ))
         }
+    }
+
+    fn visit_function_stms(&mut self, name: &str, params: &[String], body: &[Statement]) {
+        let function = LoxFunction {
+            name: name.to_string(),
+            params: params.into(),
+            body: body.into(),
+            environment: self.environment.clone(),
+        };
+
+        self.environment
+            .borrow_mut()
+            .defind(name, Value::Function(Rc::new(function)));
     }
 }
 
@@ -501,7 +550,7 @@ impl std::fmt::Display for Value {
             Value::Boolean(v) => write!(f, "{v}"),
             Value::Nil => write!(f, "nil"),
             Value::String(v) => write!(f, "{v}"),
-            Value::Function(fun) => write!(f, "function {}", fun.name()),
+            Value::Function(fun) => write!(f, "<fn {}>", fun.name()),
         }
     }
 }

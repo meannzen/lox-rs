@@ -1,1 +1,5 @@
-print clock();
+fun bar() {}
+print bar;
+
+var x = 10;
+print x;

@@ -27,4 +27,6 @@ pub trait Visitor<T, E: std::error::Error> {
     ) -> Result<(), E>;
 
     fn visit_call_expr(&mut self, callee: &Expression, args: &[Expression]) -> Result<T, E>;
+
+    fn visit_function_stms(&mut self, name: &str, params: &[String], body: &[Statement]);
 }

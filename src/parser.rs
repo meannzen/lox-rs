@@ -118,8 +118,8 @@ impl<'input> Parser<'input> {
                 continue;
             }
 
-            self.consume(TokenKind::Identifier)?;
-            params.push(TokenKind::Identifier);
+            let token = self.consume(TokenKind::Identifier)?;
+            params.push(token.literal);
         }
         self.consume(TokenKind::RightParen)?;
 

@@ -28,7 +28,7 @@ pub enum Statement {
     },
     Function {
         name: String,
-        params: Vec<TokenKind>,
+        params: Vec<String>,
         body: Vec<Statement>,
     },
 }

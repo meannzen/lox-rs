@@ -1,13 +1,13 @@
 use crate::{Callable, InterpreterError, Value};
 
 #[derive(Debug, Clone)]
-pub struct NaviveFunction {
+pub struct NativeFunction {
     pub arity: usize,
     pub name: String,
     pub function: fn(Vec<Value>) -> Result<Value, InterpreterError>,
 }
 
-impl Callable for NaviveFunction {
+impl Callable for NativeFunction {
     fn call(
         &self,
         _interpreter: &mut crate::Interpreter,
@@ -24,4 +24,3 @@ impl Callable for NaviveFunction {
         self.name.clone()
     }
 }
-
