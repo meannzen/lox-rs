@@ -25,4 +25,6 @@ pub trait Visitor<T, E: std::error::Error> {
         increment: &Option<Expression>,
         body: &Statement,
     ) -> Result<(), E>;
+
+    fn visit_call_expr(&mut self, callee: &Expression, args: &[Expression]) -> Result<T, E>;
 }

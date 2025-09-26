@@ -1,19 +1,36 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
-use crate::{Expression, Literal, Statement, TokenKind, Visitor};
+use crate::{Callable, Expression, Literal, NaviveFunction, Statement, TokenKind, Visitor};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Value {
     Number(f64),
     Boolean(bool),
     Nil,
     String(String),
+    Function(Rc<dyn Callable>),
+}
+
+impl Clone for Value {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Number(n) => Self::Number(*n),
+            Self::String(s) => Self::String(s.clone()),
+            Self::Nil => Self::Nil,
+            Self::Boolean(b) => Self::Boolean(*b),
+            Self::Function(f) => Self::Function(f.clone()),
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    Unary,
-    Binary,
+    Message(String),
     UndefinedVariable(String),
 }
 
@@ -71,8 +88,23 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Interpreter {
+        let global = Rc::new(RefCell::new(Environment::new()));
+        global.borrow_mut().defind(
+            "clock",
+            Value::Function(Rc::new(NaviveFunction {
+                name: "clock".to_string(),
+                arity: 0,
+                function: |_| {
+                    let start_time = SystemTime::now();
+                    let since_the_epoch = start_time
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards");
+                    Ok(Value::Number(since_the_epoch.as_secs_f64()))
+                },
+            })),
+        );
         Interpreter {
-            environment: Rc::new(RefCell::new(Environment::new())),
+            environment: global,
         }
     }
 }
@@ -99,6 +131,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 operator,
                 right,
             } => self.visit_logical(left, operator, right)?,
+            Expression::Call { callee, args } => self.visit_call_expr(callee, args)?,
             _ => self.visit_binary_expr(expr)?,
         };
 
@@ -139,7 +172,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
     fn visit_stmt(&mut self, stms: &Statement) -> Result<(), InterpreterError> {
         match stms {
             Statement::Print(expr) => {
-                let eval = self.visit_expr(expr)?;
+                let eval = self.evaluate(expr)?;
                 println!("{eval}");
             }
             Statement::Expr(expr) => {
@@ -185,6 +218,9 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 let condition = condition.as_ref().map(|expr| expr.as_ref().clone());
                 let increment = increment.as_ref().map(|expr| expr.as_ref().clone());
                 self.visit_for(&initialize, &condition, &increment, body)?;
+            }
+            Statement::Function { name, params, body } => {
+                println!("{name}, {params:?} {body:?}");
             }
         }
 
@@ -239,6 +275,33 @@ impl Visitor<Value, InterpreterError> for Interpreter {
 
         Ok(())
     }
+
+    fn visit_call_expr(
+        &mut self,
+        callee: &Expression,
+        args: &[Expression],
+    ) -> Result<Value, InterpreterError> {
+        let callee_value = self.evaluate(callee)?;
+        if let Value::Function(function) = callee_value {
+            if function.arity() != args.len() {
+                return Err(InterpreterError::Message(format!(
+                    "Expected {} arguments but got {}.",
+                    function.arity(),
+                    args.len()
+                )));
+            }
+
+            let mut arg_values = Vec::new();
+            for arg_expr in args {
+                arg_values.push(self.evaluate(arg_expr)?);
+            }
+            function.call(self, arg_values)
+        } else {
+            Err(InterpreterError::Message(
+                "Can only call functions and classes.".to_string(),
+            ))
+        }
+    }
 }
 
 impl Interpreter {
@@ -286,6 +349,8 @@ impl Interpreter {
                 right,
             } => self.visit_logical(left, operator, right),
 
+            Expression::Call { callee, args } => self.visit_call_expr(callee, args),
+
             binary => self.visit_binary_expr(binary),
         }
     }
@@ -331,7 +396,7 @@ impl Interpreter {
         match (op, value.clone()) {
             (TokenKind::Minus, val) => match val {
                 Value::Number(v) => Ok(Value::Number(-v)),
-                _ => Err(InterpreterError::Unary),
+                _ => Err(InterpreterError::Message("WTF".to_string())),
             },
             (TokenKind::Bang, val) => match val {
                 Value::Boolean(v) => Ok(Value::Boolean(!v)),
@@ -410,7 +475,7 @@ impl Interpreter {
                     (Value::Boolean(b), TokenKind::EqualEqual, Value::Boolean(b1)) => {
                         Ok(Value::Boolean(b == b1))
                     }
-                    _ => Err(InterpreterError::Binary),
+                    _ => Err(InterpreterError::Message("WTF".to_string())),
                 }
             }
             _ => self.visit_expr(expr),
@@ -436,6 +501,7 @@ impl std::fmt::Display for Value {
             Value::Boolean(v) => write!(f, "{v}"),
             Value::Nil => write!(f, "nil"),
             Value::String(v) => write!(f, "{v}"),
+            Value::Function(fun) => write!(f, "function {}", fun.name()),
         }
     }
 }

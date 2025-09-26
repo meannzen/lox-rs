@@ -26,6 +26,11 @@ pub enum Statement {
         increment: Option<Box<Expression>>,
         body: Box<Statement>,
     },
+    Function {
+        name: String,
+        params: Vec<TokenKind>,
+        body: Vec<Statement>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +55,11 @@ pub enum Expression {
         left: Box<Expression>,
         operator: TokenKind,
         right: Box<Expression>,
+    },
+
+    Call {
+        callee: Box<Expression>,
+        args: Vec<Expression>,
     },
 }
 
@@ -87,6 +97,7 @@ impl std::fmt::Display for Statement {
                 increment,
                 body,
             } => write!(f, "init :{initialize:?} condition:{condition:?} increment: {increment:?} body {body:?}"),
+            Statement::Function { name, params, body } => {write!(f, "function {name}({params:?}){body:?}")}
         }
     }
 }
@@ -151,6 +162,8 @@ impl std::fmt::Display for Expression {
                 operator,
                 right,
             } => write!(f, "{} {:?} {}", lelf, operator, right),
+
+            Expression::Call { callee, args } => write!(f, "{}, {:?}", callee, args),
         }
     }
 }

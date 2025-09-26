@@ -4,6 +4,7 @@ use crate::{ast::Expression, Lexer, Statement, Token, TokenKind};
 
 #[derive(Debug)]
 pub enum ParserError {
+    Message(String),
     UnexpectedEof { line: usize },
     UnexpectedToken { line: usize, token: String },
     InvalidAssignmentTarget { line: usize, token: String },
@@ -24,6 +25,8 @@ impl std::fmt::Display for ParserError {
                     "[line {line}] Error at '{token}': Invalid assignment target."
                 )
             }
+
+            ParserError::Message(s) => write!(f, "{s}"),
         }
     }
 }
@@ -74,6 +77,7 @@ impl<'input> Parser<'input> {
                 TokenKind::If => self.if_statement(),
                 TokenKind::While => self.while_statement(),
                 TokenKind::For => self.for_statement(),
+                TokenKind::Fun => self.function(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -96,6 +100,38 @@ impl<'input> Parser<'input> {
         Ok(Statement::Var {
             name: variable.literal,
             initializer,
+        })
+    }
+
+    fn function(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap(); // Consume 'var'
+        let function_name = self.peek().unwrap().literal.clone();
+        self.consume(TokenKind::Identifier)?;
+        self.consume(TokenKind::LeftParen)?;
+        let mut params = vec![];
+        while let Some(token) = self.peek() {
+            if token.kind == TokenKind::RightParen {
+                break;
+            }
+            if token.kind == TokenKind::Comma {
+                self.advance().unwrap();
+                continue;
+            }
+
+            self.consume(TokenKind::Identifier)?;
+            params.push(TokenKind::Identifier);
+        }
+        self.consume(TokenKind::RightParen)?;
+
+        let body = match self.block()? {
+            Statement::Block(v) => v,
+            _ => unreachable!(),
+        };
+
+        Ok(Statement::Function {
+            name: function_name,
+            params,
+            body,
         })
     }
 
@@ -382,7 +418,46 @@ impl<'input> Parser<'input> {
                 });
             }
         }
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Result<Expression, ParserError> {
+        let mut expr = self.primary()?;
+
+        loop {
+            if self.peek().map(|t| t.kind) == Some(TokenKind::LeftParen) {
+                self.advance().unwrap(); // Consume '('
+                expr = self.finish_call(expr)?;
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expression) -> Result<Expression, ParserError> {
+        let mut args = Vec::new();
+        if self.peek().map(|t| t.kind) != Some(TokenKind::RightParen) {
+            loop {
+                if args.len() >= 255 {
+                    return Err(ParserError::Message(
+                        "Cannot have more than 255 arguments.".to_string(),
+                    ));
+                }
+                args.push(self.expression()?);
+                if self.peek().map(|t| t.kind) != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.advance().unwrap(); // Consume ','
+            }
+        }
+
+        self.consume(TokenKind::RightParen)?;
+
+        Ok(Expression::Call {
+            callee: Box::new(callee),
+            args,
+        })
     }
 
     fn primary(&mut self) -> Result<Expression, ParserError> {
