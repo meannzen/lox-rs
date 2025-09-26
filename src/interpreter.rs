@@ -30,7 +30,7 @@ impl Clone for Value {
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    Message(String),
+    Message(String, i32),
     UndefinedVariable(String),
 }
 
@@ -320,11 +320,14 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         let callee_value = self.evaluate(callee)?;
         if let Value::Function(function) = callee_value {
             if function.arity() != args.len() {
-                return Err(InterpreterError::Message(format!(
-                    "Expected {} arguments but got {}.",
-                    function.arity(),
-                    args.len()
-                )));
+                return Err(InterpreterError::Message(
+                    format!(
+                        "Expected {} arguments but got {}.",
+                        function.arity(),
+                        args.len(),
+                    ),
+                    65,
+                ));
             }
 
             let mut arg_values = Vec::new();
@@ -335,6 +338,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         } else {
             Err(InterpreterError::Message(
                 "Can only call functions and classes.".to_string(),
+                65,
             ))
         }
     }
@@ -445,7 +449,7 @@ impl Interpreter {
         match (op, value.clone()) {
             (TokenKind::Minus, val) => match val {
                 Value::Number(v) => Ok(Value::Number(-v)),
-                _ => Err(InterpreterError::Message("WTF".to_string())),
+                _ => Err(InterpreterError::Message("WTF".to_string(), 65)),
             },
             (TokenKind::Bang, val) => match val {
                 Value::Boolean(v) => Ok(Value::Boolean(!v)),
@@ -524,7 +528,7 @@ impl Interpreter {
                     (Value::Boolean(b), TokenKind::EqualEqual, Value::Boolean(b1)) => {
                         Ok(Value::Boolean(b == b1))
                     }
-                    _ => Err(InterpreterError::Message("WTF".to_string())),
+                    _ => Err(InterpreterError::Message("WTF".to_string(), 70)),
                 }
             }
             _ => self.visit_expr(expr),
@@ -536,7 +540,7 @@ impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InterpreterError::UndefinedVariable(s) => write!(f, "Undefined variable '{s}'"),
-            _ => write!(f, "Operand must be a number."),
+            InterpreterError::Message(s, _) => write!(f, "{s}"),
         }
     }
 }

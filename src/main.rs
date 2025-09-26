@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use codecrafters_interpreter::{IlligalType, Interpreter, Lexer, TokenKind};
+use codecrafters_interpreter::{IlligalType, Interpreter, InterpreterError, Lexer, TokenKind};
 use std::{path::PathBuf, process};
 
 #[derive(Debug, Parser)]
@@ -94,11 +94,16 @@ fn main() -> codecrafters_interpreter::Result<()> {
             match parser.parse_statements() {
                 Ok(stmt) => match Interpreter::run(stmt) {
                     Ok(_) => {}
-                    Err(err) => {
-                        // lazy to do it
-                        eprintln!("{err}");
-                        process::exit(70);
-                    }
+                    Err(err) => match err {
+                        InterpreterError::Message(s, n) => {
+                            eprintln!("{s}");
+                            process::exit(n);
+                        }
+                        e => {
+                            eprintln!("{e}");
+                            process::exit(70);
+                        }
+                    },
                 },
                 Err(err) => {
                     eprintln!("{err}");
