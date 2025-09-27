@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use std::{collections::HashMap, iter::Peekable};
 
 use crate::{ast::Expression, Lexer, Statement, Token, TokenKind};
 
@@ -36,6 +36,7 @@ impl std::error::Error for ParserError {}
 pub struct Parser<'input> {
     tokens: Peekable<Lexer<'input>>,
     had_error: bool,
+    function_names: HashMap<String, usize>, // this fuckup [name function , total_argument]
 }
 
 impl<'input> Parser<'input> {
@@ -43,6 +44,7 @@ impl<'input> Parser<'input> {
         Parser {
             tokens: Lexer::new(input).peekable(),
             had_error: false,
+            function_names: HashMap::new(),
         }
     }
 
@@ -122,17 +124,21 @@ impl<'input> Parser<'input> {
         self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
         let mut params = vec![];
-        while let Some(token) = self.peek() {
-            if token.kind == TokenKind::RightParen {
-                break;
-            }
-            if token.kind == TokenKind::Comma {
-                self.advance().unwrap();
-                continue;
-            }
+        if self.peek().map(|t| t.kind) != Some(TokenKind::RightParen) {
+            loop {
+                if params.len() >= 255 {
+                    return Err(ParserError::Message(
+                        "Cannot have more than 255 parameters.".to_string(),
+                    ));
+                }
+                let param = self.consume(TokenKind::Identifier)?;
+                params.push(param.literal);
 
-            let token = self.consume(TokenKind::Identifier)?;
-            params.push(token.literal);
+                if self.peek().map(|t| t.kind) != Some(TokenKind::Comma) {
+                    break;
+                }
+                self.advance().unwrap(); // Consume ','
+            }
         }
         self.consume(TokenKind::RightParen)?;
 
@@ -140,6 +146,9 @@ impl<'input> Parser<'input> {
             Statement::Block(v) => v,
             _ => unreachable!(),
         };
+
+        self.function_names
+            .insert(function_name.clone(), params.len());
 
         Ok(Statement::Function {
             name: function_name,
@@ -450,6 +459,10 @@ impl<'input> Parser<'input> {
 
     fn finish_call(&mut self, callee: Expression) -> Result<Expression, ParserError> {
         let mut args = Vec::new();
+        let call_fn = match &callee {
+            Expression::Variable(s) => Some(s.clone()),
+            _ => None,
+        };
         if self.peek().map(|t| t.kind) != Some(TokenKind::RightParen) {
             loop {
                 if args.len() >= 255 {
@@ -466,6 +479,18 @@ impl<'input> Parser<'input> {
         }
 
         self.consume(TokenKind::RightParen)?;
+
+        if let Some(fn_name) = call_fn {
+            if let Some(fun_args) = self.function_names.get(&fn_name) {
+                if *fun_args > 0 && args.is_empty() {
+                    return Err(ParserError::Message(format!(
+                        "Expected {} arguments but got {}.",
+                        args.len(),
+                        *fun_args
+                    )));
+                }
+            }
+        }
 
         Ok(Expression::Call {
             callee: Box::new(callee),
