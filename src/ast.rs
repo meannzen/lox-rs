@@ -11,7 +11,7 @@ pub enum Statement {
     },
 
     If {
-        condition: Box<Expression>,
+        condition: Expression,
         then_branch: Box<Statement>,
         else_branch: Option<Box<Statement>>,
     },
@@ -22,14 +22,18 @@ pub enum Statement {
 
     For {
         initialize: Option<Box<Statement>>,
-        condition: Option<Box<Expression>>,
-        increment: Option<Box<Expression>>,
+        condition: Option<Expression>,
+        increment: Option<Expression>,
         body: Box<Statement>,
     },
     Function {
         name: String,
         params: Vec<String>,
         body: Vec<Statement>,
+    },
+
+    Return {
+        value: Option<Expression>,
     },
 }
 
@@ -97,7 +101,8 @@ impl std::fmt::Display for Statement {
                 increment,
                 body,
             } => write!(f, "init :{initialize:?} condition:{condition:?} increment: {increment:?} body {body:?}"),
-            Statement::Function { name, params, body } => {write!(f, "function {name}({params:?}){body:?}")}
+            Statement::Function { name, params, body } => {write!(f, "function {name}({params:?}){body:?}")},
+            Statement::Return { value }=> write!(f, "{value:?}"),
         }
     }
 }

@@ -78,6 +78,7 @@ impl<'input> Parser<'input> {
                 TokenKind::While => self.while_statement(),
                 TokenKind::For => self.for_statement(),
                 TokenKind::Fun => self.function(),
+                TokenKind::Return => self.return_statement(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -101,6 +102,18 @@ impl<'input> Parser<'input> {
             name: variable.literal,
             initializer,
         })
+    }
+
+    fn return_statement(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap(); // Consome 'return'
+        let mut value = None;
+        if self.peek().map(|t| t.kind) != Some(TokenKind::Semi) {
+            value = Some(self.expression()?);
+        }
+
+        self.consume(TokenKind::Semi)?;
+
+        Ok(Statement::Return { value })
     }
 
     fn function(&mut self) -> Result<Statement, ParserError> {
@@ -190,7 +203,7 @@ impl<'input> Parser<'input> {
         }
 
         Ok(Statement::If {
-            condition: Box::new(condition),
+            condition,
             then_branch,
             else_branch,
         })
@@ -227,14 +240,14 @@ impl<'input> Parser<'input> {
         };
 
         let condition = if self.peek().map(|t| t.kind) != Some(TokenKind::Semi) {
-            Some(Box::new(self.expression()?))
+            Some(self.expression()?)
         } else {
             None
         };
         self.consume(TokenKind::Semi)?;
 
         let increment = if self.peek().map(|t| t.kind) != Some(TokenKind::RightParen) {
-            Some(Box::new(self.expression()?))
+            Some(self.expression()?)
         } else {
             None
         };

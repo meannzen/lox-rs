@@ -32,6 +32,7 @@ impl Clone for Value {
 pub enum InterpreterError {
     Message(String, i32),
     UndefinedVariable(String),
+    ReturnError(Value),
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +65,12 @@ impl Callable for LoxFunction {
         interpreter.environment = new_env;
         let result = interpreter.visit_block(&self.body);
         interpreter.environment = old_env;
-        result.map(|_| Value::Nil)
+
+        match result {
+            Ok(_) => Ok(Value::Nil),
+            Err(InterpreterError::ReturnError(v)) => Ok(v),
+            Err(e) => Err(e),
+        }
     }
 
     fn name(&self) -> String {
@@ -251,13 +257,15 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 body,
             } => {
                 let initialize = initialize.as_ref().map(|stms| stms.as_ref().clone());
-                let condition = condition.as_ref().map(|expr| expr.as_ref().clone());
-                let increment = increment.as_ref().map(|expr| expr.as_ref().clone());
+                let condition = condition.clone();
+                let increment = increment.clone();
                 self.visit_for(&initialize, &condition, &increment, body)?;
             }
             Statement::Function { name, params, body } => {
                 self.visit_function_stms(name, params, body)
             }
+
+            Statement::Return { value } => self.visit_return_stms(value)?,
         }
 
         Ok(())
@@ -354,6 +362,16 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         self.environment
             .borrow_mut()
             .defind(name, Value::Function(Rc::new(function)));
+    }
+
+    fn visit_return_stms(&mut self, expr: &Option<Expression>) -> Result<(), InterpreterError> {
+        let return_value = if let Some(value) = expr {
+            self.evaluate(value)?
+        } else {
+            Value::Nil
+        };
+
+        Err(InterpreterError::ReturnError(return_value))
     }
 }
 
@@ -541,6 +559,7 @@ impl std::fmt::Display for InterpreterError {
         match self {
             InterpreterError::UndefinedVariable(s) => write!(f, "Undefined variable '{s}'"),
             InterpreterError::Message(s, _) => write!(f, "{s}"),
+            InterpreterError::ReturnError(v) => write!(f, "{v}"),
         }
     }
 }
