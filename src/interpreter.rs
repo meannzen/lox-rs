@@ -5,7 +5,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{Callable, Expression, Literal, NativeFunction, Statement, TokenKind, Visitor};
+use crate::{
+    Callable, Expression, Literal, NativeFunction, Resolver, Statement, TokenKind, Visitor,
+};
 
 #[derive(Debug)]
 pub enum Value {
@@ -126,6 +128,7 @@ impl Environment {
 
 pub struct Interpreter {
     environment: Rc<RefCell<Environment>>,
+    pub locals: HashMap<String, usize>,
 }
 
 impl Interpreter {
@@ -147,6 +150,7 @@ impl Interpreter {
         );
         Interpreter {
             environment: global,
+            locals: HashMap::new(),
         }
     }
 }
@@ -159,25 +163,7 @@ impl Default for Interpreter {
 
 impl Visitor<Value, InterpreterError> for Interpreter {
     fn visit_expr(&mut self, expr: &crate::Expression) -> Result<Value, InterpreterError> {
-        let value = match expr {
-            Expression::Literal(literal) => self.visit_literal_expr(literal)?,
-            Expression::Unary {
-                operator,
-                expression,
-            } => self.visit_unary_expr(expression, operator)?,
-            Expression::Group(expr) => self.visit_expr(expr)?,
-            Expression::Assign { name, value } => self.visit_assignment(name, value)?,
-            Expression::Variable(name) => self.get_value(name)?,
-            Expression::Logical {
-                left,
-                operator,
-                right,
-            } => self.visit_logical(left, operator, right)?,
-            Expression::Call { callee, args } => self.visit_call_expr(callee, args)?,
-            _ => self.visit_binary_expr(expr)?,
-        };
-
-        Ok(value)
+        self.evaluate(expr)
     }
 
     fn visit_logical(
@@ -256,11 +242,31 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 increment,
                 body,
             } => {
-                let initialize = initialize.as_ref().map(|stms| stms.as_ref().clone());
-                let condition = condition.clone();
-                let increment = increment.clone();
-                self.visit_for(&initialize, &condition, &increment, body)?;
+                let previous = self.environment.clone();
+                let loop_env = Environment::new_enclosed(&previous);
+                self.environment = loop_env;
+
+                if let Some(init) = initialize {
+                    self.visit_stmt(init)?;
+                }
+
+                loop {
+                    if let Some(con) = condition {
+                        if !is_truthy(&self.evaluate(con)?) {
+                            break;
+                        }
+                    }
+
+                    self.visit_stmt(body)?;
+
+                    if let Some(inc) = increment {
+                        self.evaluate(inc)?;
+                    }
+                }
+
+                self.environment = previous;
             }
+
             Statement::Function { name, params, body } => {
                 self.visit_function_stms(name, params, body)
             }
@@ -372,13 +378,79 @@ impl Visitor<Value, InterpreterError> for Interpreter {
 }
 
 impl Interpreter {
-    pub fn run(stmt: Vec<Statement>) -> Result<(), InterpreterError> {
-        let mut interpreter = Interpreter::new();
+    pub fn run(mut stmt: Vec<Statement>) -> Result<(), InterpreterError> {
+        let interpreter = Interpreter::new();
+        let mut resolver = Resolver::new(interpreter);
+        if let Err(e) = resolver.resolve_stmts(&mut stmt[..]) {
+            eprintln!("{}", e);
+            return Err(InterpreterError::Message(format!(
+                "Resolution error: {}",
+                e
+            )));
+        }
+
+        let mut interpreter = resolver.interpreter;
+
         for st in stmt.iter() {
             interpreter.visit_stmt(st)?;
         }
 
         Ok(())
+    }
+
+    pub fn resolve(&mut self, name: &str, distance: usize) {
+        self.locals.insert(name.to_string(), distance);
+    }
+
+    fn get_at(
+        &self,
+        environment: Rc<RefCell<Environment>>,
+        distance: usize,
+        name: &str,
+    ) -> Option<Value> {
+        let mut current_env = environment;
+        for _ in 0..distance {
+            let next_env = {
+                let env_ref = current_env.borrow();
+
+                if let Some(enclosing) = &env_ref.enclosing {
+                    Rc::clone(enclosing)
+                } else {
+                    return None;
+                }
+            };
+            current_env = next_env;
+        }
+
+        let value = current_env.borrow().values.get(name).cloned();
+        value
+    }
+
+    fn assign_at(
+        &mut self,
+        environment: Rc<RefCell<Environment>>,
+        distance: usize,
+        name: &str,
+        value: Value,
+    ) {
+        let mut current_env = environment;
+        for _ in 0..distance {
+            let next_env = {
+                let env_ref = current_env.borrow();
+
+                if let Some(enclosing) = &env_ref.enclosing {
+                    Rc::clone(enclosing)
+                } else {
+                    return;
+                }
+            };
+            current_env = next_env;
+        }
+
+        current_env
+            .borrow_mut()
+            .values
+            .insert(name.to_string(), value);
     }
 
     pub fn evaluate(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
@@ -392,24 +464,37 @@ impl Interpreter {
 
             Expression::Group(inner_expr) => self.evaluate(inner_expr),
 
-            Expression::Variable(name) => self
-                .environment
-                .borrow()
-                .get(name)
-                .ok_or(InterpreterError::UndefinedVariable(name.clone())),
-
-            Expression::Assign { name, value } => {
-                let new_value = self.evaluate(value)?;
-                if self
-                    .environment
-                    .borrow_mut()
-                    .assign(name, new_value.clone())
-                {
-                    Ok(new_value)
+            Expression::Variable { name, resolved } => {
+                if let Some(distance) = *resolved {
+                    self.get_at(self.environment.clone(), distance, name)
+                        .ok_or_else(|| InterpreterError::UndefinedVariable(name.clone()))
                 } else {
-                    Err(InterpreterError::UndefinedVariable(name.clone()))
+                    self.environment
+                        .borrow()
+                        .get(name)
+                        .ok_or_else(|| InterpreterError::UndefinedVariable(name.clone()))
                 }
             }
+
+            Expression::Assign {
+                name,
+                value,
+                resolved,
+            } => {
+                let new_value = self.evaluate(value)?;
+                if let Some(distance) = *resolved {
+                    self.assign_at(self.environment.clone(), distance, name, new_value.clone());
+                    Ok(new_value)
+                } else {
+                    let mut env = self.environment.borrow_mut();
+                    if env.assign(name, new_value.clone()) {
+                        Ok(new_value)
+                    } else {
+                        Err(InterpreterError::UndefinedVariable(name.clone()))
+                    }
+                }
+            }
+
             Expression::Logical {
                 left,
                 operator,
@@ -418,7 +503,7 @@ impl Interpreter {
 
             Expression::Call { callee, args } => self.visit_call_expr(callee, args),
 
-            binary => self.visit_binary_expr(binary),
+            _ => self.visit_binary_expr(expr),
         }
     }
 
@@ -433,37 +518,18 @@ impl Interpreter {
         Ok(value)
     }
 
-    fn get_value(&mut self, name: &str) -> Result<Value, InterpreterError> {
-        self.environment
-            .borrow()
-            .get(name)
-            .ok_or(InterpreterError::UndefinedVariable(name.to_string()))
-    }
-
-    fn visit_assignment(
-        &mut self,
-        name: &str,
-        expr: &Expression,
-    ) -> Result<Value, InterpreterError> {
-        let new_value = self.visit_expr(expr)?;
-        let mut env = self.environment.borrow_mut();
-        if env.assign(name, new_value.clone()) {
-            Ok(new_value)
-        } else {
-            Err(InterpreterError::UndefinedVariable(name.to_string()))
-        }
-    }
-
     fn visit_unary_expr(
         &mut self,
         expr: &Expression,
         op: &TokenKind,
     ) -> Result<Value, InterpreterError> {
-        let value = self.visit_expr(expr)?;
+        let value = self.evaluate(expr)?;
         match (op, value.clone()) {
             (TokenKind::Minus, val) => match val {
                 Value::Number(v) => Ok(Value::Number(-v)),
-                _ => Err(InterpreterError::Message("WTF".to_string())),
+                _ => Err(InterpreterError::Message(
+                    "Operand must be a number.".to_string(),
+                )),
             },
             (TokenKind::Bang, val) => match val {
                 Value::Boolean(v) => Ok(Value::Boolean(!v)),
@@ -481,8 +547,8 @@ impl Interpreter {
                 operator,
                 right,
             } => {
-                let left = self.visit_expr(left)?;
-                let right = self.visit_expr(right)?;
+                let left = self.evaluate(left)?;
+                let right = self.evaluate(right)?;
                 match (left, operator, right) {
                     (Value::Number(n), TokenKind::Plus, Value::Number(n1)) => {
                         Ok(Value::Number(n + n1))
@@ -512,40 +578,15 @@ impl Interpreter {
                     (Value::Number(n), TokenKind::LessEqual, Value::Number(n1)) => {
                         Ok(Value::Boolean(n <= n1))
                     }
-                    (Value::Number(n), TokenKind::EqualEqual, Value::Number(n1)) => {
-                        Ok(Value::Boolean(n == n1))
-                    }
-                    (Value::Number(n), TokenKind::BangEqual, Value::Number(n1)) => {
-                        Ok(Value::Boolean(n != n1))
-                    }
-                    (Value::String(s), TokenKind::EqualEqual, Value::String(s2)) => {
-                        Ok(Value::Boolean(s == s2))
-                    }
-                    (Value::String(s), TokenKind::BangEqual, Value::String(s2)) => {
-                        Ok(Value::Boolean(s != s2))
-                    }
-                    (Value::Number(_), TokenKind::EqualEqual, Value::String(_)) => {
-                        Ok(Value::Boolean(false))
-                    }
-                    (Value::Number(_), TokenKind::BangEqual, Value::String(_)) => {
-                        Ok(Value::Boolean(true))
-                    }
-                    (Value::String(_), TokenKind::EqualEqual, Value::Number(_)) => {
-                        Ok(Value::Boolean(false))
-                    }
-                    (Value::String(_), TokenKind::BangEqual, Value::Number(_)) => {
-                        Ok(Value::Boolean(true))
-                    }
-                    (Value::Boolean(b), TokenKind::BangEqual, Value::Boolean(b1)) => {
-                        Ok(Value::Boolean(b != b1))
-                    }
-                    (Value::Boolean(b), TokenKind::EqualEqual, Value::Boolean(b1)) => {
-                        Ok(Value::Boolean(b == b1))
-                    }
-                    _ => Err(InterpreterError::Message("WTF".to_string())),
+
+                    (l, TokenKind::EqualEqual, r) => Ok(Value::Boolean(is_equal(&l, &r))),
+                    (l, TokenKind::BangEqual, r) => Ok(Value::Boolean(!is_equal(&l, &r))),
+                    _ => Err(InterpreterError::Message(
+                        "Unsupported operation".to_string(),
+                    )),
                 }
             }
-            _ => self.visit_expr(expr),
+            _ => self.evaluate(expr),
         }
     }
 }
@@ -579,5 +620,16 @@ fn is_truthy(value: &Value) -> bool {
         Value::Boolean(v) => *v,
         Value::Nil => false,
         _ => true,
+    }
+}
+
+fn is_equal(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Nil, Value::Nil) => true,
+        (Value::Nil, _) | (_, Value::Nil) => false,
+        (Value::Boolean(b1), Value::Boolean(b2)) => b1 == b2,
+        (Value::Number(n1), Value::Number(n2)) => n1 == n2,
+        (Value::String(s1), Value::String(s2)) => s1 == s2,
+        _ => false,
     }
 }

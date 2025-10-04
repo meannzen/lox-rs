@@ -42,6 +42,7 @@ pub enum Expression {
     Assign {
         name: String,
         value: Box<Expression>,
+        resolved: Option<usize>,
     },
     Binary {
         left: Box<Expression>,
@@ -54,7 +55,10 @@ pub enum Expression {
         expression: Box<Expression>,
     },
     Group(Box<Expression>),
-    Variable(String),
+    Variable {
+        name: String,
+        resolved: Option<usize>,
+    },
     Logical {
         left: Box<Expression>,
         operator: TokenKind,
@@ -160,8 +164,12 @@ impl std::fmt::Display for Expression {
                 };
                 write!(f, "({} {})", op, expression)
             }
-            Expression::Variable(kind) => write!(f, "{kind:?}"),
-            Expression::Assign { name, value } => write!(f, "{name}={value}"),
+            Expression::Variable { name, resolved: _ } => write!(f, "{name:?}"),
+            Expression::Assign {
+                name,
+                value,
+                resolved: _,
+            } => write!(f, "{name}={value}"),
             Expression::Logical {
                 left: lelf,
                 operator,

@@ -1,3 +1,2 @@
-fun foo() { return 10; }
-
-print foo();
+var a = "hhe";
+var a = a;

@@ -298,10 +298,11 @@ impl<'input> Parser<'input> {
             let token = self.advance().unwrap();
             let value = self.assignment()?;
 
-            if let Expression::Variable(name) = expr {
+            if let Expression::Variable { name, resolved: _ } = expr {
                 return Ok(Expression::Assign {
                     name,
                     value: Box::new(value),
+                    resolved: None,
                 });
             }
 
@@ -460,7 +461,7 @@ impl<'input> Parser<'input> {
     fn finish_call(&mut self, callee: Expression) -> Result<Expression, ParserError> {
         let mut args = Vec::new();
         let call_fn = match &callee {
-            Expression::Variable(s) => Some(s.clone()),
+            Expression::Variable { name, resolved: _ } => Some(name.clone()),
             _ => None,
         };
         if self.peek().map(|t| t.kind) != Some(TokenKind::RightParen) {
@@ -512,7 +513,10 @@ impl<'input> Parser<'input> {
             TokenKind::True => Ok(Expression::Literal(crate::ast::Literal::Boolean(true))),
             TokenKind::False => Ok(Expression::Literal(crate::ast::Literal::Boolean(false))),
             TokenKind::Nil => Ok(Expression::Literal(crate::ast::Literal::Nil)),
-            TokenKind::Identifier => Ok(Expression::Variable(token.literal)),
+            TokenKind::Identifier => Ok(Expression::Variable {
+                name: token.literal,
+                resolved: None,
+            }),
             TokenKind::LeftParen => {
                 let expression = self.expression()?;
                 self.consume(TokenKind::RightParen)?;

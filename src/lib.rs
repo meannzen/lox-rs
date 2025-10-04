@@ -6,6 +6,7 @@ mod function;
 mod function_trait;
 mod interpreter;
 mod parser;
+mod resolver;
 mod tokenizer;
 mod visit;
 
@@ -14,5 +15,6 @@ pub use function::*;
 pub use function_trait::*;
 pub use interpreter::*;
 pub use parser::*;
+pub use resolver::*;
 pub use tokenizer::*;
 pub use visit::*;
