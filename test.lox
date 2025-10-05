@@ -1,2 +1,4 @@
-var a = "hhe";
-var a = a;
+var a = "outer";
+{
+ var a = a;
+}

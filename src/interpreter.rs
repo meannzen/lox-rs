@@ -31,8 +31,23 @@ impl Clone for Value {
 }
 
 #[derive(Debug)]
+pub enum ExitCode {
+    RunTimeError,
+    CompilerError,
+}
+
+impl From<ExitCode> for i32 {
+    fn from(value: ExitCode) -> Self {
+        match value {
+            ExitCode::CompilerError => 65,
+            ExitCode::RunTimeError => 70,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum InterpreterError {
-    Message(String),
+    Message(String, ExitCode), // error message and exit code
     UndefinedVariable(String),
     ReturnError(Value),
 }
@@ -334,11 +349,14 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         let callee_value = self.evaluate(callee)?;
         if let Value::Function(function) = callee_value {
             if function.arity() != args.len() {
-                return Err(InterpreterError::Message(format!(
-                    "Expected {} arguments but got {}.",
-                    function.arity(),
-                    args.len(),
-                )));
+                return Err(InterpreterError::Message(
+                    format!(
+                        "Expected {} arguments but got {}.",
+                        function.arity(),
+                        args.len(),
+                    ),
+                    ExitCode::RunTimeError,
+                ));
             }
 
             let mut arg_values = Vec::new();
@@ -349,6 +367,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         } else {
             Err(InterpreterError::Message(
                 "Can only call functions and classes.".to_string(),
+                ExitCode::RunTimeError,
             ))
         }
     }
@@ -382,11 +401,10 @@ impl Interpreter {
         let interpreter = Interpreter::new();
         let mut resolver = Resolver::new(interpreter);
         if let Err(e) = resolver.resolve_stmts(&mut stmt[..]) {
-            eprintln!("{}", e);
-            return Err(InterpreterError::Message(format!(
-                "Resolution error: {}",
-                e
-            )));
+            return Err(InterpreterError::Message(
+                format!("Resolution error: {}", e),
+                ExitCode::CompilerError,
+            ));
         }
 
         let mut interpreter = resolver.interpreter;
@@ -529,6 +547,7 @@ impl Interpreter {
                 Value::Number(v) => Ok(Value::Number(-v)),
                 _ => Err(InterpreterError::Message(
                     "Operand must be a number.".to_string(),
+                    ExitCode::RunTimeError,
                 )),
             },
             (TokenKind::Bang, val) => match val {
@@ -583,6 +602,7 @@ impl Interpreter {
                     (l, TokenKind::BangEqual, r) => Ok(Value::Boolean(!is_equal(&l, &r))),
                     _ => Err(InterpreterError::Message(
                         "Unsupported operation".to_string(),
+                        ExitCode::RunTimeError,
                     )),
                 }
             }
@@ -595,7 +615,7 @@ impl std::fmt::Display for InterpreterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InterpreterError::UndefinedVariable(s) => write!(f, "Undefined variable '{s}'"),
-            InterpreterError::Message(s) => write!(f, "{s}"),
+            InterpreterError::Message(s, _) => write!(f, "{s}"),
             InterpreterError::ReturnError(v) => write!(f, "{v}"),
         }
     }

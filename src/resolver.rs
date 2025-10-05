@@ -9,7 +9,7 @@ pub enum ResolverError {
 impl std::fmt::Display for ResolverError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResolverError::Message(s) => write!(f, "Resolver Error: {}", s),
+            ResolverError::Message(s) => write!(f, "{}", s),
         }
     }
 }
@@ -136,7 +136,23 @@ impl Resolver {
                 self.resolve_expr(right.as_mut())?;
             }
             Expression::Variable { name, resolved } => {
-                let distance = self.scopes.iter().rev().position(|s| s.contains_key(name));
+                let distance = self
+                    .scopes
+                    .iter()
+                    .rev()
+                    .position(|scope| scope.contains_key(name));
+                if let Some(dist) = distance {
+                    let scope_index = self.scopes.len() - 1 - dist;
+                    let scope = &self.scopes[scope_index];
+                    if let Some(&defined) = scope.get(name) {
+                        if !defined && scope_index != 0 {
+                            return Err(ResolverError::Message(
+                                "Error: Can't read local variable in its own initializer"
+                                    .to_string(),
+                            ));
+                        }
+                    }
+                }
                 *resolved = distance;
             }
             Expression::Assign {
@@ -168,8 +184,10 @@ impl Resolver {
                     name
                 )));
             }
+
             scope.insert(name.to_string(), false);
         }
+
         Ok(())
     }
 
