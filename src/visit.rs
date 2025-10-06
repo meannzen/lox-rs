@@ -31,4 +31,6 @@ pub trait Visitor<T, E: std::error::Error> {
     fn visit_function_stms(&mut self, name: &str, params: &[String], body: &[Statement]);
 
     fn visit_return_stms(&mut self, stms: &Option<Expression>) -> Result<(), E>;
+
+    fn visit_class(&mut self, stmt: &Statement) -> Result<(), E>;
 }

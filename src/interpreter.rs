@@ -287,6 +287,11 @@ impl Visitor<Value, InterpreterError> for Interpreter {
             }
 
             Statement::Return { value } => self.visit_return_stms(value)?,
+
+            Statement::Class {
+                name: _,
+                methods: _,
+            } => self.visit_class(stms)?,
         }
 
         Ok(())
@@ -393,6 +398,20 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         };
 
         Err(InterpreterError::ReturnError(return_value))
+    }
+
+    fn visit_class(&mut self, stmt: &Statement) -> Result<(), InterpreterError> {
+        match stmt {
+            Statement::Class { name, methods: _ } => {
+                self.environment.borrow_mut().defind(&name, Value::Nil);
+                self.environment
+                    .borrow_mut()
+                    .assign(&name, Value::String(name.clone()));
+            }
+            _ => unreachable!(),
+        }
+
+        Ok(())
     }
 }
 

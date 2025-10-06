@@ -4,6 +4,10 @@ use crate::TokenKind;
 pub enum Statement {
     Expr(Expression),
     Block(Vec<Statement>),
+    Class {
+        name: String,
+        methods: Vec<Statement>,
+    },
     Print(Expression),
     Var {
         name: String,
@@ -107,6 +111,7 @@ impl std::fmt::Display for Statement {
             } => write!(f, "init :{initialize:?} condition:{condition:?} increment: {increment:?} body {body:?}"),
             Statement::Function { name, params, body } => {write!(f, "function {name}({params:?}){body:?}")},
             Statement::Return { value }=> write!(f, "{value:?}"),
+            Statement::Class { name, methods: _ } => write!(f, "{name}")
         }
     }
 }

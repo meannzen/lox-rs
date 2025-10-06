@@ -81,6 +81,7 @@ impl<'input> Parser<'input> {
                 TokenKind::For => self.for_statement(),
                 TokenKind::Fun => self.function(),
                 TokenKind::Return => self.return_statement(),
+                TokenKind::Class => self.clase_declaration(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -103,6 +104,29 @@ impl<'input> Parser<'input> {
         Ok(Statement::Var {
             name: variable.literal,
             initializer,
+        })
+    }
+
+    fn clase_declaration(&mut self) -> Result<Statement, ParserError> {
+        self.advance().unwrap(); // Consum 'class'
+        let ident_token = self.consume(TokenKind::Identifier)?;
+        self.consume(TokenKind::LeftBrace)?;
+        let mut method = vec![];
+        while let Some(token) = self.peek() {
+            if token.kind == TokenKind::RightBrace {
+                break;
+            }
+
+            let function = self.function()?;
+            method.push(function);
+            self.advance().unwrap();
+        }
+
+        self.consume(TokenKind::RightBrace)?;
+
+        Ok(Statement::Class {
+            name: ident_token.literal,
+            methods: method,
         })
     }
 

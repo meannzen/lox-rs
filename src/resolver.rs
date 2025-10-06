@@ -121,6 +121,10 @@ impl Resolver {
 
                 self.end_scope();
             }
+            Statement::Class {
+                name: _,
+                methods: _,
+            } => {} // implement latter
         }
         Ok(())
     }
