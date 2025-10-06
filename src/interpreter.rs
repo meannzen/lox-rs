@@ -6,7 +6,8 @@ use std::{
 };
 
 use crate::{
-    Callable, Expression, Literal, NativeFunction, Resolver, Statement, TokenKind, Visitor,
+    Callable, Expression, Literal, LoxClass, NativeFunction, Resolver, Statement, TokenKind,
+    Visitor,
 };
 
 #[derive(Debug)]
@@ -404,9 +405,8 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         match stmt {
             Statement::Class { name, methods: _ } => {
                 self.environment.borrow_mut().defind(&name, Value::Nil);
-                self.environment
-                    .borrow_mut()
-                    .assign(&name, Value::String(name.clone()));
+                let value = Value::Function(Rc::new(LoxClass { name: name.clone() }));
+                self.environment.borrow_mut().assign(&name, value);
             }
             _ => unreachable!(),
         }

@@ -1,2 +1,2 @@
 class Spaceship {}
-print Spaceship;
+print Spaceship();

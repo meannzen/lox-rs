@@ -2,7 +2,7 @@ use crate::Callable;
 
 #[derive(Debug)]
 pub struct LoxClass {
-    name: String,
+    pub name: String,
 }
 
 impl Callable for LoxClass {
@@ -11,7 +11,7 @@ impl Callable for LoxClass {
         interpreter: &mut crate::Interpreter,
         args: Vec<crate::Value>,
     ) -> Result<crate::Value, crate::InterpreterError> {
-        todo!()
+        Ok(crate::Value::Nil)
     }
 
     fn arity(&self) -> usize {
@@ -19,7 +19,6 @@ impl Callable for LoxClass {
     }
 
     fn name(&self) -> String {
-        self.name.clone()
+        self.name.clone() + "instance"
     }
 }
-
