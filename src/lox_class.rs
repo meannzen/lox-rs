@@ -8,17 +8,20 @@ pub struct LoxClass {
 impl Callable for LoxClass {
     fn call(
         &self,
-        interpreter: &mut crate::Interpreter,
-        args: Vec<crate::Value>,
+        _interpreter: &mut crate::Interpreter,
+        _args: Vec<crate::Value>,
     ) -> Result<crate::Value, crate::InterpreterError> {
-        Ok(crate::Value::Nil)
+        Ok(crate::Value::Instance(crate::LoxInstance::new(
+            self.name.clone(),
+            1,
+        )))
     }
 
     fn arity(&self) -> usize {
-        return 0;
+        0
     }
 
     fn name(&self) -> String {
-        self.name.clone() + "instance"
+        self.name.clone()
     }
 }

@@ -121,11 +121,14 @@ impl Resolver {
 
                 self.end_scope();
             }
-            Statement::Class {
-                name: _,
-                methods: _,
-            } => {} // implement latter
+            Statement::Class { name, methods: _ } => self.resolve_class(name)?,
         }
+        Ok(())
+    }
+
+    fn resolve_class(&mut self, name: &str) -> Result<(), ResolverError> {
+        self.declare(name)?;
+        self.define(name);
         Ok(())
     }
 

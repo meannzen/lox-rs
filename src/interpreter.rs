@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::{
-    Callable, Expression, Literal, LoxClass, NativeFunction, Resolver, Statement, TokenKind,
-    Visitor,
+    Callable, Expression, Literal, LoxClass, LoxInstance, NativeFunction, Resolver, Statement,
+    TokenKind, Visitor,
 };
 
 #[derive(Debug)]
@@ -17,6 +17,8 @@ pub enum Value {
     Nil,
     String(String),
     Function(Rc<dyn Callable>),
+    Class(Rc<dyn Callable>),
+    Instance(LoxInstance),
 }
 
 impl Clone for Value {
@@ -27,6 +29,8 @@ impl Clone for Value {
             Self::Nil => Self::Nil,
             Self::Boolean(b) => Self::Boolean(*b),
             Self::Function(f) => Self::Function(f.clone()),
+            Self::Class(class) => Self::Class(class.clone()),
+            Self::Instance(instance) => Self::Instance(instance.clone()),
         }
     }
 }
@@ -370,6 +374,8 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 arg_values.push(self.evaluate(arg_expr)?);
             }
             function.call(self, arg_values)
+        } else if let Value::Class(class) = callee_value {
+            class.call(self, vec![])
         } else {
             Err(InterpreterError::Message(
                 "Can only call functions and classes.".to_string(),
@@ -404,9 +410,9 @@ impl Visitor<Value, InterpreterError> for Interpreter {
     fn visit_class(&mut self, stmt: &Statement) -> Result<(), InterpreterError> {
         match stmt {
             Statement::Class { name, methods: _ } => {
-                self.environment.borrow_mut().defind(&name, Value::Nil);
-                let value = Value::Function(Rc::new(LoxClass { name: name.clone() }));
-                self.environment.borrow_mut().assign(&name, value);
+                self.environment.borrow_mut().defind(name, Value::Nil);
+                let value = Value::Class(Rc::new(LoxClass { name: name.clone() }));
+                self.environment.borrow_mut().assign(name, value);
             }
             _ => unreachable!(),
         }
@@ -650,6 +656,8 @@ impl std::fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::String(v) => write!(f, "{v}"),
             Value::Function(fun) => write!(f, "<fn {}>", fun.name()),
+            Value::Class(class) => write!(f, "{}", class.name()),
+            Value::Instance(ins) => write!(f, "{}", ins.name()),
         }
     }
 }
