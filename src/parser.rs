@@ -330,6 +330,16 @@ impl<'input> Parser<'input> {
                 });
             }
 
+            if let Expression::Get { object, name } = expr {
+                return Ok(Expression::Set {
+                    object,
+                    property: name,
+                    value: Box::new(value),
+                });
+            }
+
+            //println!("expr: {expr:?}");
+
             return Err(ParserError::InvalidAssignmentTarget {
                 line: token.line,
                 token: token.literal,
@@ -475,6 +485,13 @@ impl<'input> Parser<'input> {
             if self.peek().map(|t| t.kind) == Some(TokenKind::LeftParen) {
                 self.advance().unwrap(); // Consume '('
                 expr = self.finish_call(expr)?;
+            } else if self.peek().map(|t| t.kind) == Some(TokenKind::Dot) {
+                self.advance().unwrap(); // Consume '.'
+                let ident = self.consume(TokenKind::Identifier)?;
+                expr = Expression::Get {
+                    object: Box::new(expr),
+                    name: ident.literal,
+                }
             } else {
                 break;
             }

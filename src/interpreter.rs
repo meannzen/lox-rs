@@ -419,6 +419,41 @@ impl Visitor<Value, InterpreterError> for Interpreter {
 
         Ok(())
     }
+
+    fn visit_get_expr(
+        &mut self,
+        expr: &Expression,
+        name: String,
+    ) -> Result<Value, InterpreterError> {
+        let value = self.evaluate(expr)?;
+        match value {
+            Value::Instance(instance) => instance.get(&name),
+            _ => Err(InterpreterError::Message(
+                "Only instances have properties.".to_string(),
+                ExitCode::RunTimeError,
+            )),
+        }
+    }
+
+    fn visit_set_expr(
+        &mut self,
+        expr: &Expression,
+        name: String,
+        value: &Expression,
+    ) -> Result<Value, InterpreterError> {
+        let val = self.evaluate(expr)?;
+        match val {
+            Value::Instance(instance) => {
+                let value = self.evaluate(value)?;
+                instance.set(&name, value.clone());
+                Ok(value)
+            }
+            _ => Err(InterpreterError::Message(
+                "Only instances have fields.".to_string(),
+                ExitCode::RunTimeError,
+            )),
+        }
+    }
 }
 
 impl Interpreter {
@@ -546,6 +581,13 @@ impl Interpreter {
 
             Expression::Call { callee, args } => self.visit_call_expr(callee, args),
 
+            Expression::Get { object, name } => self.visit_get_expr(object, name.clone()),
+
+            Expression::Set {
+                object,
+                property,
+                value,
+            } => self.visit_set_expr(object, property.clone(), value),
             _ => self.visit_binary_expr(expr),
         }
     }

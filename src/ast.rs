@@ -73,6 +73,16 @@ pub enum Expression {
         callee: Box<Expression>,
         args: Vec<Expression>,
     },
+
+    Set {
+        object: Box<Expression>,
+        property: String,
+        value: Box<Expression>,
+    },
+    Get {
+        object: Box<Expression>,
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -182,6 +192,13 @@ impl std::fmt::Display for Expression {
             } => write!(f, "{} {:?} {}", lelf, operator, right),
 
             Expression::Call { callee, args } => write!(f, "{}, {:?}", callee, args),
+
+            Expression::Set {
+                object,
+                property,
+                value,
+            } => write!(f, "{object:?} {property} {value:?}"),
+            Expression::Get { object, name } => write!(f, "{object:?}.{name}"),
         }
     }
 }

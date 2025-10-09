@@ -1,6 +1,8 @@
+use std::rc::Rc;
+
 use crate::Callable;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoxClass {
     pub name: String,
 }
@@ -11,10 +13,8 @@ impl Callable for LoxClass {
         _interpreter: &mut crate::Interpreter,
         _args: Vec<crate::Value>,
     ) -> Result<crate::Value, crate::InterpreterError> {
-        Ok(crate::Value::Instance(crate::LoxInstance::new(
-            self.name.clone(),
-            1,
-        )))
+        let class_rc = Rc::new(self.clone());
+        Ok(crate::Value::Instance(crate::LoxInstance::new(class_rc)))
     }
 
     fn arity(&self) -> usize {

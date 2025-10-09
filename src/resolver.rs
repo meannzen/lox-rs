@@ -177,6 +177,18 @@ impl Resolver {
                     self.resolve_expr(arg)?;
                 }
             }
+
+            Expression::Set {
+                object,
+                property: _,
+                value,
+            } => {
+                self.resolve_expr(object)?;
+                self.resolve_expr(value)?;
+            }
+            Expression::Get { object, name: _ } => {
+                self.resolve_expr(object)?;
+            }
         }
         Ok(())
     }

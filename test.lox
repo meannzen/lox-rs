@@ -1,4 +1,11 @@
-class Spaceship {}
-var falcon = Spaceship();
-print Spaceship;  
-print falcon;
+class Robot {}
+var r2d2 = Robot();
+
+r2d2.model = "Astromech";
+r2d2.operational = true;
+
+if (r2d2.operational) {
+  print r2d2.model;
+  r2d2.mission = "Navigate hyperspace";
+  print r2d2.mission;
+}
