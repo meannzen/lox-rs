@@ -1,10 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InterpreterError, LoxClass, Value};
+use crate::{InterpreterError, LoxClass, LoxFunction, Value};
 
 #[derive(Debug, Clone)]
 pub struct LoxInstance {
-    class: Rc<LoxClass>, // Assuming LoxClass is Rc-able
+    class: Rc<LoxClass>,
     fields: Rc<RefCell<HashMap<String, Value>>>,
 }
 
@@ -17,12 +17,18 @@ impl LoxInstance {
     }
 
     pub fn get(&self, name: &str) -> Result<Value, InterpreterError> {
-        self.fields.borrow().get(name).cloned().ok_or_else(|| {
-            InterpreterError::Message(
-                format!("Undefined property '{}'.", name),
-                crate::ExitCode::RunTimeError,
-            )
-        })
+        if let Some(value) = self.fields.borrow().get(name).cloned() {
+            return Ok(value);
+        }
+
+        if let Some(method) = self.find_method(name) {
+            return Ok(Value::Function(Rc::new(method)));
+        }
+
+        Err(InterpreterError::Message(
+            format!("Undefined property '{}'.", name),
+            crate::ExitCode::RunTimeError,
+        ))
     }
 
     pub fn set(&self, name: &str, value: Value) {
@@ -32,5 +38,8 @@ impl LoxInstance {
     pub fn name(&self) -> String {
         format!("{} instance", self.class.name.clone())
     }
-}
 
+    fn find_method(&self, name: &str) -> Option<LoxFunction> {
+        self.class.methods.borrow().get(name).cloned()
+    }
+}

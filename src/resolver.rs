@@ -24,6 +24,7 @@ pub struct Resolver {
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 impl Resolver {
@@ -121,14 +122,32 @@ impl Resolver {
 
                 self.end_scope();
             }
-            Statement::Class { name, methods: _ } => self.resolve_class(name)?,
+            Statement::Class { name, methods } => self.resolve_class(name, methods)?,
         }
         Ok(())
     }
 
-    fn resolve_class(&mut self, name: &str) -> Result<(), ResolverError> {
+    fn resolve_class(
+        &mut self,
+        name: &str,
+        methods: &mut Vec<Statement>,
+    ) -> Result<(), ResolverError> {
         self.declare(name)?;
         self.define(name);
+
+        for method in methods {
+            match method {
+                Statement::Function {
+                    name: _,
+                    params,
+                    body,
+                } => {
+                    let function_type = FunctionType::Method;
+                    self.resolve_function(params, body, function_type)?;
+                }
+                _ => unreachable!(),
+            }
+        }
         Ok(())
     }
 

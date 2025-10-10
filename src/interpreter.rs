@@ -64,7 +64,7 @@ struct Environment {
 }
 
 #[derive(Debug, Clone)]
-struct LoxFunction {
+pub struct LoxFunction {
     name: String,
     params: Vec<String>,
     body: Vec<Statement>,
@@ -409,9 +409,25 @@ impl Visitor<Value, InterpreterError> for Interpreter {
 
     fn visit_class(&mut self, stmt: &Statement) -> Result<(), InterpreterError> {
         match stmt {
-            Statement::Class { name, methods: _ } => {
+            Statement::Class { name, methods } => {
                 self.environment.borrow_mut().defind(name, Value::Nil);
-                let value = Value::Class(Rc::new(LoxClass { name: name.clone() }));
+                let class = LoxClass::new(name.clone());
+                for method in methods {
+                    match method {
+                        Statement::Function { name, params, body } => {
+                            let function = LoxFunction {
+                                name: name.clone(),
+                                params: params.clone(),
+                                body: body.clone(),
+                                environment: self.environment.clone(),
+                            };
+
+                            class.create_method(name.clone(), function);
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                let value = Value::Class(Rc::new(class));
                 self.environment.borrow_mut().assign(name, value);
             }
             _ => unreachable!(),

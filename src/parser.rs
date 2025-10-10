@@ -79,7 +79,10 @@ impl<'input> Parser<'input> {
                 TokenKind::If => self.if_statement(),
                 TokenKind::While => self.while_statement(),
                 TokenKind::For => self.for_statement(),
-                TokenKind::Fun => self.function(),
+                TokenKind::Fun => {
+                    self.advance().unwrap();
+                    self.function()
+                }
                 TokenKind::Return => self.return_statement(),
                 TokenKind::Class => self.clase_declaration(),
                 _ => self.expr_statement(),
@@ -119,7 +122,6 @@ impl<'input> Parser<'input> {
 
             let function = self.function()?;
             method.push(function);
-            self.advance().unwrap();
         }
 
         self.consume(TokenKind::RightBrace)?;
@@ -143,7 +145,6 @@ impl<'input> Parser<'input> {
     }
 
     fn function(&mut self) -> Result<Statement, ParserError> {
-        self.advance().unwrap(); // Consume 'var'
         let function_name = self.peek().unwrap().literal.clone();
         self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
