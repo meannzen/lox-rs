@@ -1,11 +1,22 @@
-{
-  class Foo {
-     returnSelf() {
-      // Should be able to return the class itself
-      return Foo;
-   }
+class Base {
+  method() {
+    print "Base.method()";
   }
+}
 
-   // Calling a method on an instance should work
-   print Foo().returnSelf();
- }
+class Parent < Base {
+  method() {
+    super.method();
+  }
+}
+
+class Child < Parent {
+  method() {
+    super.method();
+  }
+}
+
+var parent = Parent();
+parent.method();
+var child = Child();
+child.method();

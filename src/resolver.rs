@@ -26,6 +26,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    Subclass,
 }
 
 pub struct Resolver {
@@ -162,17 +163,27 @@ impl Resolver {
         self.define(name);
 
         let enclosing_class = self.current_class;
-        self.current_class = ClassType::Class;
+        let is_subclass = superclass.is_some();
 
         if let Some(super_name) = superclass {
             let mut dummy_resolved = None;
-            self.resolve_variable(super_name, &mut dummy_resolved, false)?;
+            self.resolve_variable(super_name, &mut dummy_resolved, true)?;
 
             if super_name == name {
                 return Err(ResolverError::Message(
                     "A class can't inherit from itself.".to_string(),
                 ));
             }
+        }
+
+        self.current_class = if is_subclass {
+            ClassType::Subclass
+        } else {
+            ClassType::Class
+        };
+        self.begin_scope();
+        if is_subclass {
+            self.define("super");
         }
 
         for method in methods.iter_mut() {
@@ -193,6 +204,7 @@ impl Resolver {
             }
         }
 
+        self.end_scope();
         self.current_class = enclosing_class;
         Ok(())
     }
@@ -201,9 +213,24 @@ impl Resolver {
         &mut self,
         name: &str,
         resolved: &mut Option<usize>,
-        _read: bool,
+        read: bool,
     ) -> Result<(), ResolverError> {
-        *resolved = self.resolve_local(name);
+        let distance = self.resolve_local(name);
+        if read {
+            if let Some(dist) = distance {
+                let scope_index = self.scopes.len() - 1 - dist;
+                if let Some(scope) = self.scopes.get(scope_index) {
+                    if let Some(&defined) = scope.get(name) {
+                        if !defined && scope_index != 0 {
+                            return Err(ResolverError::Message(
+                                "Can't read local variable in its own initializer".to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        *resolved = distance;
         Ok(())
     }
 
@@ -228,12 +255,13 @@ impl Resolver {
                 let distance = self.resolve_local(name);
                 if let Some(dist) = distance {
                     let scope_index = self.scopes.len() - 1 - dist;
-                    let scope = &self.scopes[scope_index];
-                    if let Some(&defined) = scope.get(name) {
-                        if !defined && scope_index != 0 {
-                            return Err(ResolverError::Message(
-                                "Can't read local variable in its own initializer".to_string(),
-                            ));
+                    if let Some(scope) = self.scopes.get(scope_index) {
+                        if let Some(&defined) = scope.get(name) {
+                            if !defined && scope_index != 0 {
+                                return Err(ResolverError::Message(
+                                    "Can't read local variable in its own initializer".to_string(),
+                                ));
+                            }
                         }
                     }
                 }
@@ -248,23 +276,20 @@ impl Resolver {
                 let distance = self.resolve_local("this");
                 *resolved = distance;
             }
-            Expression::Super { resolved } => {
-                if self.current_class != ClassType::Class {
+            Expression::Super {
+                resolved,
+                method: _,
+            } => {
+                if self.current_class == ClassType::None {
                     return Err(ResolverError::Message(
-                        "Cannot use 'super' outside of a class.".to_string(),
+                        "Can't use 'super' outside of a class.".to_string(),
                     ));
-                }
-                if self.current_function != FunctionType::Method {
+                } else if self.current_class != ClassType::Subclass {
                     return Err(ResolverError::Message(
-                        "Cannot use 'super' in a class field.".to_string(),
+                        "Can't use 'super' in a class with no superclass.".to_string(),
                     ));
                 }
                 let distance = self.resolve_local("super");
-                if distance.is_none() {
-                    return Err(ResolverError::Message(
-                        "Cannot use 'super' in a class with no superclass.".to_string(),
-                    ));
-                }
                 *resolved = distance;
             }
             Expression::Assign {

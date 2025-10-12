@@ -89,6 +89,7 @@ pub enum Expression {
     },
     Super {
         resolved: Option<usize>,
+        method: String,
     },
 }
 
@@ -205,7 +206,7 @@ impl std::fmt::Display for Expression {
             } => write!(f, "{object:?} {property} {value:?}"),
             Expression::Get { object, name } => write!(f, "{object:?}.{name}"),
             Expression::This { resolved } => write!(f, "{resolved:?}"),
-            Expression::Super { resolved } => write!(f, "{:?}", resolved),
+            Expression::Super { resolved, method } => write!(f, "{:?} {}", resolved, method),
         }
     }
 }

@@ -470,19 +470,31 @@ impl Visitor<Value, InterpreterError> for Interpreter {
             None
         };
 
+        let closure = Environment::new_enclosed(&self.environment);
+        if let Some(sclass) = &superclass_value {
+            closure
+                .borrow_mut()
+                .define("super", Value::Class(sclass.clone()));
+        }
+        let closure_rc = Rc::new(RefCell::new(closure));
+
         let class = LoxClass::new(name.to_string(), superclass_value);
         for method in methods {
             match method {
-                Statement::Function { name, params, body } => {
+                Statement::Function {
+                    name: method_name,
+                    params,
+                    body,
+                } => {
                     let function = LoxFunction {
-                        name: name.clone(),
+                        name: method_name.clone(),
                         params: params.clone(),
                         body: body.clone(),
-                        environment: self.environment.clone(),
-                        is_initializer: name == "init",
+                        environment: closure_rc.borrow().clone(),
+                        is_initializer: method_name == "init",
                     };
 
-                    class.create_method(name.clone(), function);
+                    class.create_method(method_name.clone(), function);
                 }
                 _ => unreachable!(),
             }
@@ -677,23 +689,62 @@ impl Interpreter {
                     ))
                 }
             }
-            Expression::Super { resolved } => {
-                if let Some(distance) = *resolved {
-                    self.get_at(self.environment.clone(), distance, "super")
-                        .ok_or_else(|| InterpreterError::UndefinedVariable("super".to_string()))
-                        .and_then(|v| match v {
-                            Value::Class(_) => Ok(v),
-                            _ => Err(InterpreterError::Message(
-                                "Expected a class for 'super'.".to_string(),
-                                ExitCode::RunTimeError,
-                            )),
-                        })
-                } else {
-                    Err(InterpreterError::Message(
-                        "Cannot use 'super' here.".to_string(),
+            Expression::Super { method, resolved } => {
+                let distance = resolved.ok_or_else(|| {
+                    InterpreterError::Message(
+                        "Cannot use 'super' outside of a class.".to_string(),
                         ExitCode::RunTimeError,
-                    ))
-                }
+                    )
+                })?;
+
+                let super_class_val = self
+                    .get_at(self.environment.clone(), distance, "super")
+                    .ok_or(InterpreterError::Message(
+                        "Cannot use 'super' outside of a class.".to_string(),
+                        ExitCode::RunTimeError,
+                    ))?;
+
+                let super_class = match super_class_val {
+                    Value::Class(c) => c,
+                    _ => {
+                        return Err(InterpreterError::Message(
+                            "'super' must be used within a class that has a superclass."
+                                .to_string(),
+                            ExitCode::RunTimeError,
+                        ))
+                    }
+                };
+
+                let this_val =
+                    self.environment
+                        .borrow()
+                        .get("this")
+                        .ok_or(InterpreterError::Message(
+                            "Cannot use 'super' in a static context.".to_string(),
+                            ExitCode::RunTimeError,
+                        ))?;
+
+                let this_instance = match this_val {
+                    Value::Instance(i) => i,
+                    _ => {
+                        return Err(InterpreterError::Message(
+                            "Cannot use 'super' in a static context.".to_string(),
+                            ExitCode::RunTimeError,
+                        ))
+                    }
+                };
+
+                let method_func = super_class.find_method(method).ok_or_else(|| {
+                    InterpreterError::Message(
+                        format!("Undefined property '{}'.", method),
+                        ExitCode::RunTimeError,
+                    )
+                })?;
+
+                Ok(Value::Function(Rc::new(BoundMethod {
+                    function: Rc::new(method_func),
+                    instance: this_instance,
+                })))
             }
             Expression::Binary { .. } => self.visit_binary_expr(expr),
         }

@@ -535,6 +535,14 @@ impl<'input> Parser<'input> {
                 Ok(Expression::Group(Box::new(expression)))
             }
             TokenKind::This => Ok(Expression::This { resolved: None }),
+            TokenKind::Super => {
+                self.consume(TokenKind::Dot)?;
+                let method = self.consume(TokenKind::Identifier)?;
+                Ok(Expression::Super {
+                    method: method.literal,
+                    resolved: None,
+                })
+            }
             _ => Err(ParserError::UnexpectedToken {
                 line: token.line,
                 token: token.literal,
