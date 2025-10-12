@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::Peekable};
+use std::iter::Peekable;
 
 use crate::{ast::Expression, Lexer, Statement, Token, TokenKind};
 
@@ -36,7 +36,6 @@ impl std::error::Error for ParserError {}
 pub struct Parser<'input> {
     tokens: Peekable<Lexer<'input>>,
     had_error: bool,
-    function_names: HashMap<String, usize>, // this fuckup [name function , total_argument]
 }
 
 impl<'input> Parser<'input> {
@@ -44,7 +43,6 @@ impl<'input> Parser<'input> {
         Parser {
             tokens: Lexer::new(input).peekable(),
             had_error: false,
-            function_names: HashMap::new(),
         }
     }
 
@@ -84,7 +82,7 @@ impl<'input> Parser<'input> {
                     self.function()
                 }
                 TokenKind::Return => self.return_statement(),
-                TokenKind::Class => self.clase_declaration(),
+                TokenKind::Class => self.class_declaration(),
                 _ => self.expr_statement(),
             }
         } else {
@@ -110,25 +108,25 @@ impl<'input> Parser<'input> {
         })
     }
 
-    fn clase_declaration(&mut self) -> Result<Statement, ParserError> {
+    fn class_declaration(&mut self) -> Result<Statement, ParserError> {
         self.advance().unwrap(); // Consum 'class'
         let ident_token = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftBrace)?;
-        let mut method = vec![];
+        let mut methods = vec![];
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::RightBrace {
                 break;
             }
 
             let function = self.function()?;
-            method.push(function);
+            methods.push(function);
         }
 
         self.consume(TokenKind::RightBrace)?;
 
         Ok(Statement::Class {
             name: ident_token.literal,
-            methods: method,
+            methods,
         })
     }
 
@@ -145,8 +143,7 @@ impl<'input> Parser<'input> {
     }
 
     fn function(&mut self) -> Result<Statement, ParserError> {
-        let function_name = self.peek().unwrap().literal.clone();
-        self.consume(TokenKind::Identifier)?;
+        let function_name = self.consume(TokenKind::Identifier)?.literal;
         self.consume(TokenKind::LeftParen)?;
         let mut params = vec![];
         if self.peek().map(|t| t.kind) != Some(TokenKind::RightParen) {
@@ -171,9 +168,6 @@ impl<'input> Parser<'input> {
             Statement::Block(v) => v,
             _ => unreachable!(),
         };
-
-        self.function_names
-            .insert(function_name.clone(), params.len());
 
         Ok(Statement::Function {
             name: function_name,
@@ -221,19 +215,7 @@ impl<'input> Parser<'input> {
 
         if self.peek().map(|t| t.kind) == Some(TokenKind::Else) {
             self.advance().unwrap(); // Consume 'else'
-            else_branch = if self.peek().map(|t| t.kind) == Some(TokenKind::Var) {
-                self.advance().unwrap();
-                let variable = self.consume(TokenKind::Identifier)?;
-                self.consume(TokenKind::Equal)?;
-                let initial = Some(self.expression()?);
-                self.consume(TokenKind::Semi)?;
-                Some(Box::new(Statement::Var {
-                    name: variable.literal,
-                    initializer: initial,
-                }))
-            } else {
-                Some(Box::new(self.statement()?))
-            };
+            else_branch = Some(Box::new(self.statement()?));
         }
 
         Ok(Statement::If {
@@ -378,7 +360,6 @@ impl<'input> Parser<'input> {
                 right: Box::new(right),
             };
         }
-
         Ok(expr)
     }
 
@@ -502,10 +483,6 @@ impl<'input> Parser<'input> {
 
     fn finish_call(&mut self, callee: Expression) -> Result<Expression, ParserError> {
         let mut args = Vec::new();
-        let call_fn = match &callee {
-            Expression::Variable { name, resolved: _ } => Some(name.clone()),
-            _ => None,
-        };
         if self.peek().map(|t| t.kind) != Some(TokenKind::RightParen) {
             loop {
                 if args.len() >= 255 {
@@ -522,18 +499,6 @@ impl<'input> Parser<'input> {
         }
 
         self.consume(TokenKind::RightParen)?;
-
-        if let Some(fn_name) = call_fn {
-            if let Some(fun_args) = self.function_names.get(&fn_name) {
-                if *fun_args > 0 && args.is_empty() {
-                    return Err(ParserError::Message(format!(
-                        "Expected {} arguments but got {}.",
-                        args.len(),
-                        *fun_args
-                    )));
-                }
-            }
-        }
 
         Ok(Expression::Call {
             callee: Box::new(callee),
@@ -564,6 +529,7 @@ impl<'input> Parser<'input> {
                 self.consume(TokenKind::RightParen)?;
                 Ok(Expression::Group(Box::new(expression)))
             }
+            TokenKind::This => Ok(Expression::This { resolved: None }),
             _ => Err(ParserError::UnexpectedToken {
                 line: token.line,
                 token: token.literal,

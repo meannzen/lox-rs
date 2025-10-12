@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{Callable, LoxFunction};
+use crate::{BoundMethod, Callable, LoxFunction, LoxInstance};
 
 #[derive(Debug, Clone)]
 pub struct LoxClass {
@@ -19,20 +19,37 @@ impl LoxClass {
     pub fn create_method(&self, name: String, method: LoxFunction) {
         self.methods.borrow_mut().insert(name, method);
     }
+    pub fn find_method(&self, name: &str) -> Option<LoxFunction> {
+        self.methods.borrow().get(name).cloned()
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 impl Callable for LoxClass {
     fn call(
         &self,
-        _interpreter: &mut crate::Interpreter,
-        _args: Vec<crate::Value>,
+        interpreter: &mut crate::Interpreter,
+        args: Vec<crate::Value>,
     ) -> Result<crate::Value, crate::InterpreterError> {
-        let class_rc = Rc::new(self.clone());
-        Ok(crate::Value::Instance(crate::LoxInstance::new(class_rc)))
+        let instance = LoxInstance::new(Rc::new(self.clone()));
+        let instance_rc = Rc::new(instance);
+        if let Some(initializer) = self.find_method("init") {
+            let bound = BoundMethod {
+                function: Rc::new(initializer),
+                instance: instance_rc.clone(),
+            };
+            let bound_rc: Rc<dyn Callable> = Rc::new(bound);
+            bound_rc.call(interpreter, args)?;
+        }
+
+        Ok(crate::Value::Instance(instance_rc))
     }
 
     fn arity(&self) -> usize {
-        0
+        self.find_method("init").map_or(0, |init| init.arity())
     }
 
     fn name(&self) -> String {

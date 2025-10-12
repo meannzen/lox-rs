@@ -83,6 +83,9 @@ pub enum Expression {
         object: Box<Expression>,
         name: String,
     },
+    This {
+        resolved: Option<usize>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -199,6 +202,7 @@ impl std::fmt::Display for Expression {
                 value,
             } => write!(f, "{object:?} {property} {value:?}"),
             Expression::Get { object, name } => write!(f, "{object:?}.{name}"),
+            Expression::This { resolved } => write!(f, "{resolved:?}"),
         }
     }
 }

@@ -14,17 +14,25 @@ impl std::fmt::Display for ResolverError {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FunctionType {
+    None,
+    Function,
+    Initializer,
+    Method,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassType {
+    None,
+    Class,
+}
+
 pub struct Resolver {
     scopes: Vec<HashMap<String, bool>>,
     pub interpreter: Interpreter,
     current_function: FunctionType,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum FunctionType {
-    None,
-    Function,
-    Method,
+    current_class: ClassType,
 }
 
 impl Resolver {
@@ -34,6 +42,7 @@ impl Resolver {
             scopes,
             interpreter,
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
 
@@ -71,7 +80,11 @@ impl Resolver {
             Statement::Function { name, params, body } => {
                 self.declare(name)?;
                 self.define(name);
-                self.resolve_function(params, body, FunctionType::Function)?;
+                self.resolve_function(
+                    params.as_slice(),
+                    body.as_mut_slice(),
+                    FunctionType::Function,
+                )?;
             }
             Statement::Expr(expr) | Statement::Print(expr) => {
                 self.resolve_expr(expr)?;
@@ -93,9 +106,15 @@ impl Resolver {
                         "Can't return from top-level code.".to_string(),
                     ));
                 }
+                if matches!(self.current_function, FunctionType::Initializer) && value.is_some() {
+                    return Err(ResolverError::Message(
+                        "Can't return a value from an initializer.".to_string(),
+                    ));
+                }
                 if let Some(expr) = value {
                     self.resolve_expr(expr)?;
                 }
+                return Ok(());
             }
             Statement::While { condition, body } => {
                 self.resolve_expr(condition)?;
@@ -130,24 +149,33 @@ impl Resolver {
     fn resolve_class(
         &mut self,
         name: &str,
-        methods: &mut Vec<Statement>,
+        methods: &mut [Statement],
     ) -> Result<(), ResolverError> {
+        let enclosing_class = self.current_class;
+        self.current_class = ClassType::Class;
+
         self.declare(name)?;
         self.define(name);
 
-        for method in methods {
-            match method {
-                Statement::Function {
-                    name: _,
-                    params,
-                    body,
-                } => {
-                    let function_type = FunctionType::Method;
-                    self.resolve_function(params, body, function_type)?;
-                }
-                _ => unreachable!(),
+        for method in methods.iter_mut() {
+            if let Statement::Function {
+                name: ref method_name,
+                params,
+                body,
+            } = method
+            {
+                let function_type = if method_name == "init" {
+                    FunctionType::Initializer
+                } else {
+                    FunctionType::Method
+                };
+                self.resolve_function(params.as_slice(), body.as_mut_slice(), function_type)?;
+            } else {
+                unreachable!();
             }
         }
+
+        self.current_class = enclosing_class;
         Ok(())
     }
 
@@ -173,12 +201,24 @@ impl Resolver {
                     if let Some(&defined) = scope.get(name) {
                         if !defined && scope_index != 0 {
                             return Err(ResolverError::Message(
-                                "Error: Can't read local variable in its own initializer"
-                                    .to_string(),
+                                "Can't read local variable in its own initializer".to_string(),
                             ));
                         }
                     }
                 }
+                *resolved = distance;
+            }
+            Expression::This { resolved } => {
+                if self.current_class != ClassType::Class {
+                    return Err(ResolverError::Message(
+                        "Cannot use 'this' outside of a class.".to_string(),
+                    ));
+                }
+                let distance = self
+                    .scopes
+                    .iter()
+                    .rev()
+                    .position(|scope| scope.contains_key("this"));
                 *resolved = distance;
             }
             Expression::Assign {
@@ -241,10 +281,17 @@ impl Resolver {
         body: &mut [Statement],
         function_type: FunctionType,
     ) -> Result<(), ResolverError> {
-        let enclosing_function = self.current_function.clone();
+        let enclosing_function = self.current_function;
         self.current_function = function_type;
 
         self.begin_scope();
+        if matches!(
+            function_type,
+            FunctionType::Method | FunctionType::Initializer
+        ) {
+            self.declare("this")?;
+            self.define("this");
+        }
         for param in params {
             self.declare(param)?;
             self.define(param);

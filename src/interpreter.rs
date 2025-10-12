@@ -18,7 +18,7 @@ pub enum Value {
     String(String),
     Function(Rc<dyn Callable>),
     Class(Rc<dyn Callable>),
-    Instance(LoxInstance),
+    Instance(Rc<LoxInstance>),
 }
 
 impl Clone for Value {
@@ -101,6 +101,52 @@ impl Callable for LoxFunction {
 
     fn arity(&self) -> usize {
         self.params.len()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundMethod {
+    pub function: Rc<LoxFunction>,
+    pub instance: Rc<LoxInstance>,
+}
+
+impl Callable for BoundMethod {
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: Vec<Value>,
+    ) -> Result<Value, InterpreterError> {
+        let old_env = interpreter.environment.clone();
+        let new_env = Environment::new_enclosed(&self.function.environment);
+
+        for (name, value) in self.function.params.iter().zip(args.iter()) {
+            new_env.borrow_mut().defind(name, value.clone());
+        }
+
+        new_env
+            .borrow_mut()
+            .defind("this", Value::Instance(self.instance.clone()));
+        interpreter.environment = new_env;
+        let result = interpreter.visit_block(&self.function.body);
+        interpreter.environment = old_env;
+
+        match result {
+            Ok(_) => Ok(Value::Nil),
+            Err(InterpreterError::ReturnError(v)) => Ok(v),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn arity(&self) -> usize {
+        self.function.arity()
+    }
+
+    fn name(&self) -> String {
+        format!(
+            "<bound method {} of {}>",
+            self.function.name,
+            self.instance.name()
+        )
     }
 }
 
@@ -604,6 +650,24 @@ impl Interpreter {
                 property,
                 value,
             } => self.visit_set_expr(object, property.clone(), value),
+            Expression::This { resolved } => {
+                if let Some(distance) = *resolved {
+                    self.get_at(self.environment.clone(), distance, "this")
+                        .ok_or_else(|| InterpreterError::UndefinedVariable("this".to_string()))
+                        .and_then(|v| match v {
+                            Value::Instance(_) => Ok(v),
+                            _ => Err(InterpreterError::Message(
+                                "Expected an instance for 'this'.".to_string(),
+                                ExitCode::RunTimeError,
+                            )),
+                        })
+                } else {
+                    Err(InterpreterError::Message(
+                        "Cannot use 'this' here.".to_string(),
+                        ExitCode::RunTimeError,
+                    ))
+                }
+            }
             _ => self.visit_binary_expr(expr),
         }
     }

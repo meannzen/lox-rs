@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{InterpreterError, LoxClass, LoxFunction, Value};
+use crate::{BoundMethod, InterpreterError, LoxClass, LoxFunction, Value};
 
 #[derive(Debug, Clone)]
 pub struct LoxInstance {
@@ -22,7 +22,10 @@ impl LoxInstance {
         }
 
         if let Some(method) = self.find_method(name) {
-            return Ok(Value::Function(Rc::new(method)));
+            return Ok(Value::Function(Rc::new(BoundMethod {
+                function: Rc::new(method),
+                instance: Rc::new(self.clone()),
+            })));
         }
 
         Err(InterpreterError::Message(

@@ -1,33 +1,15 @@
-class Superhero {
-  useSpecialPower(hero) {
-    print "Using power: " + hero.specialPower;
-  }
+class Wizard {
+  getSpellCaster() {
+    fun castSpell() {
+      print this;
+      print "Casting spell as " + this.name;
+    }
 
-  hasSpecialPower(hero) {
-    return hero.specialPower;
-  }
-
-  giveSpecialPower(hero, power) {
-    hero.specialPower = power;
+    return castSpell;
   }
 }
 
-// Methods in functions
-fun performHeroics(hero, superheroClass) {
-  if (superheroClass.hasSpecialPower(hero)) {
-    superheroClass.useSpecialPower(hero);
-  } else {
-    print "No special power available";
-  }
-}
+var wizard = Wizard();
+wizard.name = "Merlin";
+wizard.getSpellCaster()();
 
-var superman = Superhero();
-var heroClass = Superhero();
-
-if (true) {
-  heroClass.giveSpecialPower(superman, "Flight");
-} else {
-  heroClass.giveSpecialPower(superman, "Strength");
-}
-
-performHeroics(superman, heroClass);
