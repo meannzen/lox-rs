@@ -43,6 +43,6 @@ impl LoxInstance {
     }
 
     fn find_method(&self, name: &str) -> Option<LoxFunction> {
-        self.class.methods.borrow().get(name).cloned()
+        self.class.find_method(name)
     }
 }

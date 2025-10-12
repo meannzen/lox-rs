@@ -1,17 +1,19 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{BoundMethod, Callable, LoxFunction, LoxInstance};
+use crate::{BoundMethod, Callable, LoxFunction, LoxInstance, Value};
 
 #[derive(Debug, Clone)]
 pub struct LoxClass {
     pub name: String,
+    pub superclass: Option<Rc<LoxClass>>,
     pub methods: Rc<RefCell<HashMap<String, LoxFunction>>>,
 }
 
 impl LoxClass {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, superclass: Option<Rc<LoxClass>>) -> Self {
         LoxClass {
             name,
+            superclass,
             methods: Rc::new(RefCell::new(HashMap::new())),
         }
     }
@@ -19,8 +21,12 @@ impl LoxClass {
     pub fn create_method(&self, name: String, method: LoxFunction) {
         self.methods.borrow_mut().insert(name, method);
     }
+
     pub fn find_method(&self, name: &str) -> Option<LoxFunction> {
-        self.methods.borrow().get(name).cloned()
+        if let Some(m) = self.methods.borrow().get(name) {
+            return Some(m.clone());
+        }
+        self.superclass.as_ref().and_then(|s| s.find_method(name))
     }
 
     pub fn name(&self) -> String {
@@ -45,7 +51,7 @@ impl Callable for LoxClass {
             bound_rc.call(interpreter, args)?;
         }
 
-        Ok(crate::Value::Instance(instance_rc))
+        Ok(Value::Instance(instance_rc))
     }
 
     fn arity(&self) -> usize {

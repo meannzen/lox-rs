@@ -6,6 +6,7 @@ pub enum Statement {
     Block(Vec<Statement>),
     Class {
         name: String,
+        superclass: Option<String>,
         methods: Vec<Statement>,
     },
     Print(Expression),
@@ -86,6 +87,9 @@ pub enum Expression {
     This {
         resolved: Option<usize>,
     },
+    Super {
+        resolved: Option<usize>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -124,7 +128,7 @@ impl std::fmt::Display for Statement {
             } => write!(f, "init :{initialize:?} condition:{condition:?} increment: {increment:?} body {body:?}"),
             Statement::Function { name, params, body } => {write!(f, "function {name}({params:?}){body:?}")},
             Statement::Return { value }=> write!(f, "{value:?}"),
-            Statement::Class { name, methods: _ } => write!(f, "{name}")
+            Statement::Class { name, methods: _, superclass:_ } => write!(f, "{name}")
         }
     }
 }
@@ -193,9 +197,7 @@ impl std::fmt::Display for Expression {
                 operator,
                 right,
             } => write!(f, "{} {:?} {}", lelf, operator, right),
-
             Expression::Call { callee, args } => write!(f, "{}, {:?}", callee, args),
-
             Expression::Set {
                 object,
                 property,
@@ -203,6 +205,7 @@ impl std::fmt::Display for Expression {
             } => write!(f, "{object:?} {property} {value:?}"),
             Expression::Get { object, name } => write!(f, "{object:?}.{name}"),
             Expression::This { resolved } => write!(f, "{resolved:?}"),
+            Expression::Super { resolved } => write!(f, "{:?}", resolved),
         }
     }
 }

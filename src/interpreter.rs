@@ -17,7 +17,7 @@ pub enum Value {
     Nil,
     String(String),
     Function(Rc<dyn Callable>),
-    Class(Rc<dyn Callable>),
+    Class(Rc<LoxClass>),
     Instance(Rc<LoxInstance>),
 }
 
@@ -351,9 +351,10 @@ impl Visitor<Value, InterpreterError> for Interpreter {
             Statement::Return { value } => self.visit_return_stms(value)?,
 
             Statement::Class {
-                name: _,
-                methods: _,
-            } => self.visit_class(stms)?,
+                name,
+                superclass,
+                methods,
+            } => self.visit_class(name.as_str(), superclass.as_deref(), methods)?,
         }
 
         Ok(())
@@ -441,34 +442,54 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         Err(InterpreterError::ReturnError(return_value))
     }
 
-    fn visit_class(&mut self, stmt: &Statement) -> Result<(), InterpreterError> {
-        match stmt {
-            Statement::Class { name, methods } => {
-                self.environment
-                    .borrow_mut()
-                    .define(name.as_str(), Value::Nil);
-                let class = LoxClass::new(name.clone());
-                for method in methods.iter() {
-                    match method {
-                        Statement::Function { name, params, body } => {
-                            let function = LoxFunction {
-                                name: name.clone(),
-                                params: params.clone(),
-                                body: body.clone(),
-                                environment: self.environment.clone(),
-                                is_initializer: name == "init",
-                            };
+    fn visit_class(
+        &mut self,
+        name: &str,
+        superclass: Option<&str>,
+        methods: &[Statement],
+    ) -> Result<(), InterpreterError> {
+        self.environment.borrow_mut().define(name, Value::Nil);
 
-                            class.create_method(name.clone(), function);
-                        }
-                        _ => unreachable!(),
-                    }
+        let superclass_value = if let Some(super_name) = superclass {
+            Some(
+                self.environment
+                    .borrow()
+                    .get(super_name)
+                    .and_then(|v| match v {
+                        Value::Class(c) => Some(c.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        InterpreterError::Message(
+                            format!("Undefined superclass '{}'.", super_name),
+                            ExitCode::RunTimeError,
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
+
+        let class = LoxClass::new(name.to_string(), superclass_value);
+        for method in methods {
+            match method {
+                Statement::Function { name, params, body } => {
+                    let function = LoxFunction {
+                        name: name.clone(),
+                        params: params.clone(),
+                        body: body.clone(),
+                        environment: self.environment.clone(),
+                        is_initializer: name == "init",
+                    };
+
+                    class.create_method(name.clone(), function);
                 }
-                let value = Value::Class(Rc::new(class));
-                self.environment.borrow_mut().assign(name.as_str(), value);
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
         }
+
+        let value = Value::Class(Rc::new(class));
+        self.environment.borrow_mut().assign(name, value);
 
         Ok(())
     }
@@ -587,14 +608,11 @@ impl Interpreter {
     pub fn evaluate(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
         match expr {
             Expression::Literal(literal) => self.visit_literal_expr(literal),
-
             Expression::Unary {
                 operator,
                 expression,
             } => self.visit_unary_expr(expression, operator),
-
             Expression::Group(inner_expr) => self.evaluate(inner_expr),
-
             Expression::Variable { name, resolved } => {
                 if let Some(distance) = *resolved {
                     self.get_at(self.environment.clone(), distance, name.as_str())
@@ -606,7 +624,6 @@ impl Interpreter {
                         .ok_or_else(|| InterpreterError::UndefinedVariable(name.clone()))
                 }
             }
-
             Expression::Assign {
                 name,
                 value,
@@ -630,17 +647,13 @@ impl Interpreter {
                     }
                 }
             }
-
             Expression::Logical {
                 left,
                 operator,
                 right,
             } => self.visit_logical(left, operator, right),
-
             Expression::Call { callee, args } => self.visit_call_expr(callee, args),
-
             Expression::Get { object, name } => self.visit_get_expr(object, name.clone()),
-
             Expression::Set {
                 object,
                 property,
@@ -660,6 +673,24 @@ impl Interpreter {
                 } else {
                     Err(InterpreterError::Message(
                         "Cannot use 'this' here.".to_string(),
+                        ExitCode::RunTimeError,
+                    ))
+                }
+            }
+            Expression::Super { resolved } => {
+                if let Some(distance) = *resolved {
+                    self.get_at(self.environment.clone(), distance, "super")
+                        .ok_or_else(|| InterpreterError::UndefinedVariable("super".to_string()))
+                        .and_then(|v| match v {
+                            Value::Class(_) => Ok(v),
+                            _ => Err(InterpreterError::Message(
+                                "Expected a class for 'super'.".to_string(),
+                                ExitCode::RunTimeError,
+                            )),
+                        })
+                } else {
+                    Err(InterpreterError::Message(
+                        "Cannot use 'super' here.".to_string(),
                         ExitCode::RunTimeError,
                     ))
                 }

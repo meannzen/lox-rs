@@ -141,8 +141,12 @@ impl Resolver {
 
                 self.end_scope();
             }
-            Statement::Class { name, methods } => {
-                self.resolve_class(name.as_str(), methods.as_mut_slice())?
+            Statement::Class {
+                name,
+                superclass,
+                methods,
+            } => {
+                self.resolve_class(name.as_str(), superclass.as_deref(), methods.as_mut_slice())?
             }
         }
         Ok(())
@@ -151,13 +155,25 @@ impl Resolver {
     fn resolve_class(
         &mut self,
         name: &str,
+        superclass: Option<&str>,
         methods: &mut [Statement],
     ) -> Result<(), ResolverError> {
+        self.declare(name)?;
+        self.define(name);
+
         let enclosing_class = self.current_class;
         self.current_class = ClassType::Class;
 
-        self.declare(name)?;
-        self.define(name);
+        if let Some(super_name) = superclass {
+            let mut dummy_resolved = None;
+            self.resolve_variable(super_name, &mut dummy_resolved, false)?;
+
+            if super_name == name {
+                return Err(ResolverError::Message(
+                    "A class can't inherit from itself.".to_string(),
+                ));
+            }
+        }
 
         for method in methods.iter_mut() {
             if let Statement::Function {
@@ -181,6 +197,23 @@ impl Resolver {
         Ok(())
     }
 
+    fn resolve_variable(
+        &mut self,
+        name: &str,
+        resolved: &mut Option<usize>,
+        _read: bool,
+    ) -> Result<(), ResolverError> {
+        *resolved = self.resolve_local(name);
+        Ok(())
+    }
+
+    fn resolve_local(&self, name: &str) -> Option<usize> {
+        self.scopes
+            .iter()
+            .rev()
+            .position(|scope| scope.contains_key(name))
+    }
+
     fn resolve_expr(&mut self, expr: &mut Expression) -> Result<(), ResolverError> {
         match expr {
             Expression::Literal(_) | Expression::Group(_) => {}
@@ -192,11 +225,7 @@ impl Resolver {
                 self.resolve_expr(right.as_mut())?;
             }
             Expression::Variable { name, resolved } => {
-                let distance = self
-                    .scopes
-                    .iter()
-                    .rev()
-                    .position(|scope| scope.contains_key(name));
+                let distance = self.resolve_local(name);
                 if let Some(dist) = distance {
                     let scope_index = self.scopes.len() - 1 - dist;
                     let scope = &self.scopes[scope_index];
@@ -211,16 +240,31 @@ impl Resolver {
                 *resolved = distance;
             }
             Expression::This { resolved } => {
-                if self.current_class != ClassType::Class {
+                if self.current_class == ClassType::None {
                     return Err(ResolverError::Message(
                         "Cannot use 'this' outside of a class.".to_string(),
                     ));
                 }
-                let distance = self
-                    .scopes
-                    .iter()
-                    .rev()
-                    .position(|scope| scope.contains_key("this"));
+                let distance = self.resolve_local("this");
+                *resolved = distance;
+            }
+            Expression::Super { resolved } => {
+                if self.current_class != ClassType::Class {
+                    return Err(ResolverError::Message(
+                        "Cannot use 'super' outside of a class.".to_string(),
+                    ));
+                }
+                if self.current_function != FunctionType::Method {
+                    return Err(ResolverError::Message(
+                        "Cannot use 'super' in a class field.".to_string(),
+                    ));
+                }
+                let distance = self.resolve_local("super");
+                if distance.is_none() {
+                    return Err(ResolverError::Message(
+                        "Cannot use 'super' in a class with no superclass.".to_string(),
+                    ));
+                }
                 *resolved = distance;
             }
             Expression::Assign {
@@ -229,7 +273,7 @@ impl Resolver {
                 resolved,
             } => {
                 self.resolve_expr(value.as_mut())?;
-                let distance = self.scopes.iter().rev().position(|s| s.contains_key(name));
+                let distance = self.resolve_local(name);
                 *resolved = distance;
             }
             Expression::Call { callee, args } => {

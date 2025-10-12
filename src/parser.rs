@@ -109,8 +109,14 @@ impl<'input> Parser<'input> {
     }
 
     fn class_declaration(&mut self) -> Result<Statement, ParserError> {
-        self.advance().unwrap(); // Consum 'class'
-        let ident_token = self.consume(TokenKind::Identifier)?;
+        self.advance().unwrap(); // Consume 'class'
+        let name = self.consume(TokenKind::Identifier)?.literal;
+        let superclass = if self.peek().map(|t| t.kind) == Some(TokenKind::Less) {
+            self.advance().unwrap(); // Consume '<'
+            Some(self.consume(TokenKind::Identifier)?.literal)
+        } else {
+            None
+        };
         self.consume(TokenKind::LeftBrace)?;
         let mut methods = vec![];
         while let Some(token) = self.peek() {
@@ -125,13 +131,14 @@ impl<'input> Parser<'input> {
         self.consume(TokenKind::RightBrace)?;
 
         Ok(Statement::Class {
-            name: ident_token.literal,
+            name,
+            superclass,
             methods,
         })
     }
 
     fn return_statement(&mut self) -> Result<Statement, ParserError> {
-        self.advance().unwrap(); // Consome 'return'
+        self.advance().unwrap(); // Consume 'return'
         let mut value = None;
         if self.peek().map(|t| t.kind) != Some(TokenKind::Semi) {
             value = Some(self.expression()?);
@@ -320,8 +327,6 @@ impl<'input> Parser<'input> {
                     value: Box::new(value),
                 });
             }
-
-            //println!("expr: {expr:?}");
 
             return Err(ParserError::InvalidAssignmentTarget {
                 line: token.line,
