@@ -71,15 +71,15 @@ impl Resolver {
                 self.end_scope();
             }
             Statement::Var { name, initializer } => {
-                self.declare(name)?;
+                self.declare(name.as_str())?;
                 if let Some(expr) = initializer {
                     self.resolve_expr(expr)?;
                 }
-                self.define(name);
+                self.define(name.as_str());
             }
             Statement::Function { name, params, body } => {
-                self.declare(name)?;
-                self.define(name);
+                self.declare(name.as_str())?;
+                self.define(name.as_str());
                 self.resolve_function(
                     params.as_slice(),
                     body.as_mut_slice(),
@@ -141,7 +141,9 @@ impl Resolver {
 
                 self.end_scope();
             }
-            Statement::Class { name, methods } => self.resolve_class(name, methods)?,
+            Statement::Class { name, methods } => {
+                self.resolve_class(name.as_str(), methods.as_mut_slice())?
+            }
         }
         Ok(())
     }
@@ -293,8 +295,8 @@ impl Resolver {
             self.define("this");
         }
         for param in params {
-            self.declare(param)?;
-            self.define(param);
+            self.declare(param.as_str())?;
+            self.define(param.as_str());
         }
         self.resolve_stmts(body)?;
         self.end_scope();

@@ -52,7 +52,7 @@ impl From<ExitCode> for i32 {
 
 #[derive(Debug)]
 pub enum InterpreterError {
-    Message(String, ExitCode), // error message and exit code
+    Message(String, ExitCode),
     UndefinedVariable(String),
     ReturnError(Value),
 }
@@ -69,6 +69,7 @@ pub struct LoxFunction {
     params: Vec<String>,
     body: Vec<Statement>,
     environment: Rc<RefCell<Environment>>,
+    is_initializer: bool,
 }
 
 impl Callable for LoxFunction {
@@ -81,7 +82,7 @@ impl Callable for LoxFunction {
         let new_env = Environment::new_enclosed(&self.environment.clone());
 
         for (name, value) in self.params.iter().zip(args.iter()) {
-            new_env.borrow_mut().defind(name, value.clone());
+            new_env.borrow_mut().define(name.as_str(), value.clone());
         }
 
         interpreter.environment = new_env;
@@ -120,19 +121,31 @@ impl Callable for BoundMethod {
         let new_env = Environment::new_enclosed(&self.function.environment);
 
         for (name, value) in self.function.params.iter().zip(args.iter()) {
-            new_env.borrow_mut().defind(name, value.clone());
+            new_env.borrow_mut().define(name.as_str(), value.clone());
         }
 
         new_env
             .borrow_mut()
-            .defind("this", Value::Instance(self.instance.clone()));
+            .define("this", Value::Instance(self.instance.clone()));
         interpreter.environment = new_env;
         let result = interpreter.visit_block(&self.function.body);
         interpreter.environment = old_env;
 
         match result {
-            Ok(_) => Ok(Value::Nil),
-            Err(InterpreterError::ReturnError(v)) => Ok(v),
+            Ok(_) => {
+                if self.function.is_initializer {
+                    Ok(Value::Instance(self.instance.clone()))
+                } else {
+                    Ok(Value::Nil)
+                }
+            }
+            Err(InterpreterError::ReturnError(v)) => {
+                if self.function.is_initializer {
+                    Ok(Value::Instance(self.instance.clone()))
+                } else {
+                    Ok(v)
+                }
+            }
             Err(e) => Err(e),
         }
     }
@@ -165,7 +178,7 @@ impl Environment {
         }))
     }
 
-    pub fn defind(&mut self, name: &str, value: Value) {
+    pub fn define(&mut self, name: &str, value: Value) {
         self.values.insert(name.to_string(), value);
     }
 
@@ -184,8 +197,7 @@ impl Environment {
             self.values.insert(name.to_string(), value);
             true
         } else if let Some(enclosing) = &self.enclosing {
-            enclosing.borrow_mut().assign(name, value);
-            true
+            enclosing.borrow_mut().assign(name, value)
         } else {
             false
         }
@@ -200,7 +212,7 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new() -> Interpreter {
         let global = Rc::new(RefCell::new(Environment::new()));
-        global.borrow_mut().defind(
+        global.borrow_mut().define(
             "clock",
             Value::Function(Rc::new(NativeFunction {
                 name: "clock".to_string(),
@@ -280,7 +292,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                     Value::Nil
                 };
 
-                self.environment.borrow_mut().defind(name, value);
+                self.environment.borrow_mut().define(name.as_str(), value);
             }
 
             Statement::Block(list) => {
@@ -297,8 +309,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                 then_branch,
                 else_branch,
             } => {
-                let expression = condition.clone();
-                self.visit_if_stms(&expression, then_branch, else_branch)?;
+                self.visit_if_stms(condition, then_branch, else_branch)?;
             }
 
             Statement::While { condition, body } => self.visit_while(condition, body)?,
@@ -369,34 +380,6 @@ impl Visitor<Value, InterpreterError> for Interpreter {
         Ok(())
     }
 
-    fn visit_for(
-        &mut self,
-        initialize: &Option<Statement>,
-        condition: &Option<Expression>,
-        increment: &Option<Expression>,
-        body: &Statement,
-    ) -> Result<(), InterpreterError> {
-        if let Some(init) = initialize {
-            self.visit_stmt(init)?;
-        }
-
-        loop {
-            if let Some(con) = condition {
-                if !is_truthy(&self.evaluate(con)?) {
-                    break;
-                }
-            }
-
-            self.visit_stmt(body)?;
-
-            if let Some(inc) = increment {
-                self.evaluate(inc)?;
-            }
-        }
-
-        Ok(())
-    }
-
     fn visit_call_expr(
         &mut self,
         callee: &Expression,
@@ -421,7 +404,11 @@ impl Visitor<Value, InterpreterError> for Interpreter {
             }
             function.call(self, arg_values)
         } else if let Value::Class(class) = callee_value {
-            class.call(self, vec![])
+            let mut arg_values = Vec::new();
+            for arg_expr in args {
+                arg_values.push(self.evaluate(arg_expr)?);
+            }
+            class.call(self, arg_values)
         } else {
             Err(InterpreterError::Message(
                 "Can only call functions and classes.".to_string(),
@@ -433,14 +420,15 @@ impl Visitor<Value, InterpreterError> for Interpreter {
     fn visit_function_stms(&mut self, name: &str, params: &[String], body: &[Statement]) {
         let function = LoxFunction {
             name: name.to_string(),
-            params: params.into(),
-            body: body.into(),
+            params: params.to_vec(),
+            body: body.to_vec(),
             environment: self.environment.clone(),
+            is_initializer: false,
         };
 
         self.environment
             .borrow_mut()
-            .defind(name, Value::Function(Rc::new(function)));
+            .define(name, Value::Function(Rc::new(function)));
     }
 
     fn visit_return_stms(&mut self, expr: &Option<Expression>) -> Result<(), InterpreterError> {
@@ -456,9 +444,11 @@ impl Visitor<Value, InterpreterError> for Interpreter {
     fn visit_class(&mut self, stmt: &Statement) -> Result<(), InterpreterError> {
         match stmt {
             Statement::Class { name, methods } => {
-                self.environment.borrow_mut().defind(name, Value::Nil);
+                self.environment
+                    .borrow_mut()
+                    .define(name.as_str(), Value::Nil);
                 let class = LoxClass::new(name.clone());
-                for method in methods {
+                for method in methods.iter() {
                     match method {
                         Statement::Function { name, params, body } => {
                             let function = LoxFunction {
@@ -466,6 +456,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                                 params: params.clone(),
                                 body: body.clone(),
                                 environment: self.environment.clone(),
+                                is_initializer: name == "init",
                             };
 
                             class.create_method(name.clone(), function);
@@ -474,7 +465,7 @@ impl Visitor<Value, InterpreterError> for Interpreter {
                     }
                 }
                 let value = Value::Class(Rc::new(class));
-                self.environment.borrow_mut().assign(name, value);
+                self.environment.borrow_mut().assign(name.as_str(), value);
             }
             _ => unreachable!(),
         }
@@ -606,12 +597,12 @@ impl Interpreter {
 
             Expression::Variable { name, resolved } => {
                 if let Some(distance) = *resolved {
-                    self.get_at(self.environment.clone(), distance, name)
+                    self.get_at(self.environment.clone(), distance, name.as_str())
                         .ok_or_else(|| InterpreterError::UndefinedVariable(name.clone()))
                 } else {
                     self.environment
                         .borrow()
-                        .get(name)
+                        .get(name.as_str())
                         .ok_or_else(|| InterpreterError::UndefinedVariable(name.clone()))
                 }
             }
@@ -623,11 +614,16 @@ impl Interpreter {
             } => {
                 let new_value = self.evaluate(value)?;
                 if let Some(distance) = *resolved {
-                    self.assign_at(self.environment.clone(), distance, name, new_value.clone());
+                    self.assign_at(
+                        self.environment.clone(),
+                        distance,
+                        name.as_str(),
+                        new_value.clone(),
+                    );
                     Ok(new_value)
                 } else {
                     let mut env = self.environment.borrow_mut();
-                    if env.assign(name, new_value.clone()) {
+                    if env.assign(name.as_str(), new_value.clone()) {
                         Ok(new_value)
                     } else {
                         Err(InterpreterError::UndefinedVariable(name.clone()))
@@ -668,7 +664,7 @@ impl Interpreter {
                     ))
                 }
             }
-            _ => self.visit_binary_expr(expr),
+            Expression::Binary { .. } => self.visit_binary_expr(expr),
         }
     }
 
@@ -707,53 +703,49 @@ impl Interpreter {
     }
 
     fn visit_binary_expr(&mut self, expr: &Expression) -> Result<Value, InterpreterError> {
-        match expr {
-            Expression::Binary {
-                left,
-                operator,
-                right,
-            } => {
-                let left = self.evaluate(left)?;
-                let right = self.evaluate(right)?;
-                match (left, operator, right) {
-                    (Value::Number(n), TokenKind::Plus, Value::Number(n1)) => {
-                        Ok(Value::Number(n + n1))
-                    }
-                    (Value::String(s), TokenKind::Plus, Value::String(s1)) => {
-                        let s = format!("{s}{s1}");
-                        Ok(Value::String(s))
-                    }
-                    (Value::Number(n), TokenKind::Minus, Value::Number(n1)) => {
-                        Ok(Value::Number(n - n1))
-                    }
-                    (Value::Number(n), TokenKind::Star, Value::Number(n1)) => {
-                        Ok(Value::Number(n * n1))
-                    }
-                    (Value::Number(n), TokenKind::Slash, Value::Number(n1)) => {
-                        Ok(Value::Number(n / n1))
-                    }
-                    (Value::Number(n), TokenKind::Greater, Value::Number(n1)) => {
-                        Ok(Value::Boolean(n > n1))
-                    }
-                    (Value::Number(n), TokenKind::Less, Value::Number(n1)) => {
-                        Ok(Value::Boolean(n < n1))
-                    }
-                    (Value::Number(n), TokenKind::GreaterEqual, Value::Number(n1)) => {
-                        Ok(Value::Boolean(n >= n1))
-                    }
-                    (Value::Number(n), TokenKind::LessEqual, Value::Number(n1)) => {
-                        Ok(Value::Boolean(n <= n1))
-                    }
-
-                    (l, TokenKind::EqualEqual, r) => Ok(Value::Boolean(is_equal(&l, &r))),
-                    (l, TokenKind::BangEqual, r) => Ok(Value::Boolean(!is_equal(&l, &r))),
-                    _ => Err(InterpreterError::Message(
-                        "Unsupported operation".to_string(),
-                        ExitCode::RunTimeError,
-                    )),
+        if let Expression::Binary {
+            left,
+            operator,
+            right,
+        } = expr
+        {
+            let left = self.evaluate(left)?;
+            let right = self.evaluate(right)?;
+            match (left, operator, right) {
+                (Value::Number(n), TokenKind::Plus, Value::Number(n1)) => Ok(Value::Number(n + n1)),
+                (Value::String(s), TokenKind::Plus, Value::String(s1)) => {
+                    let s = format!("{s}{s1}");
+                    Ok(Value::String(s))
                 }
+                (Value::Number(n), TokenKind::Minus, Value::Number(n1)) => {
+                    Ok(Value::Number(n - n1))
+                }
+                (Value::Number(n), TokenKind::Star, Value::Number(n1)) => Ok(Value::Number(n * n1)),
+                (Value::Number(n), TokenKind::Slash, Value::Number(n1)) => {
+                    Ok(Value::Number(n / n1))
+                }
+                (Value::Number(n), TokenKind::Greater, Value::Number(n1)) => {
+                    Ok(Value::Boolean(n > n1))
+                }
+                (Value::Number(n), TokenKind::Less, Value::Number(n1)) => {
+                    Ok(Value::Boolean(n < n1))
+                }
+                (Value::Number(n), TokenKind::GreaterEqual, Value::Number(n1)) => {
+                    Ok(Value::Boolean(n >= n1))
+                }
+                (Value::Number(n), TokenKind::LessEqual, Value::Number(n1)) => {
+                    Ok(Value::Boolean(n <= n1))
+                }
+
+                (l, TokenKind::EqualEqual, r) => Ok(Value::Boolean(is_equal(&l, &r))),
+                (l, TokenKind::BangEqual, r) => Ok(Value::Boolean(!is_equal(&l, &r))),
+                _ => Err(InterpreterError::Message(
+                    "Unsupported operation".to_string(),
+                    ExitCode::RunTimeError,
+                )),
             }
-            _ => self.evaluate(expr),
+        } else {
+            unreachable!()
         }
     }
 }
