@@ -5,8 +5,9 @@ authors = ["Codecrafters <hello@codecrafters.io>"]
 edition = "2021"
 rust-version = "1.80"
 
-[dependencies]
-anyhow = "1.0.100"                                # error handling
-bytes = "1.3.0"                                  # helps manage buffers
+[dependencies]                            
+bytes = "1.10.1"                                  
+thiserror = "1.0.38"                         
+anyhow = "1.0.100"                                                    
 clap = { version = "4.5.51", features = ["derive"] }        
-thiserror = "2.0.17"                             # error handling
+
